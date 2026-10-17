@@ -1,0 +1,1664 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Szobaakusztika-mérő</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: felső fülsáv + egy oszlopos munkaterület, panelek rácsban; mérési adat monospace-ben */
+:root{
+  --bg:#eef1f0; --surface:#ffffff; --sunk:#f6f8f7; --fg:#18201e; --muted:#58635f; --line:#d5dcd9;
+  --accent:#1d6b74; --accent-fg:#ffffff; --accent-soft:rgba(29,107,116,.12);
+  --ok:#2c7a47; --warn:#9a6200; --fail:#b0261d;
+  --c-l:#2b62b8; --c-r:#c4502a; --c-room-l:#2f8a5b; --c-room-r:#8a4bb0; --c-grid:#e2e7e5; --c-axis:#58635f;
+  --c-mode1:rgba(176,38,29,.55); --c-mode2:rgba(154,98,0,.45); --c-mode3:rgba(88,99,95,.30); --c-sbir:rgba(43,98,184,.55);
+  --sans:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1312; --surface:#171d1c; --sunk:#121716; --fg:#e3e9e7; --muted:#95a09c; --line:#2a3331;
+  --accent:#5db2ba; --accent-fg:#0b1514; --accent-soft:rgba(93,178,186,.14);
+  --ok:#5bbf7c; --warn:#e3a640; --fail:#f06d63;
+  --c-l:#6d9cf0; --c-r:#f08a5d; --c-room-l:#5ccf8f; --c-room-r:#c08ae6; --c-grid:#232b2a; --c-axis:#95a09c;
+  --c-mode1:rgba(240,109,99,.55); --c-mode2:rgba(227,166,64,.45); --c-mode3:rgba(149,160,156,.30); --c-sbir:rgba(109,156,240,.6);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1312; --surface:#171d1c; --sunk:#121716; --fg:#e3e9e7; --muted:#95a09c; --line:#2a3331;
+  --accent:#5db2ba; --accent-fg:#0b1514; --accent-soft:rgba(93,178,186,.14);
+  --ok:#5bbf7c; --warn:#e3a640; --fail:#f06d63;
+  --c-l:#6d9cf0; --c-r:#f08a5d; --c-room-l:#5ccf8f; --c-room-r:#c08ae6; --c-grid:#232b2a; --c-axis:#95a09c;
+  --c-mode1:rgba(240,109,99,.55); --c-mode2:rgba(227,166,64,.45); --c-mode3:rgba(149,160,156,.30); --c-sbir:rgba(109,156,240,.6);
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:16px;line-height:1.5;-webkit-text-size-adjust:100%}
+.top{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top-inner{max-width:1100px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding-block:10px}
+.brand{font-weight:600;font-size:1.05rem;letter-spacing:-.01em}
+.brand .ver{font-family:var(--mono);font-size:.75rem;color:var(--muted);font-weight:400;margin-left:6px}
+nav{display:flex;gap:4px;flex-wrap:wrap;flex:1}
+nav button{background:transparent;color:var(--muted);border:1px solid transparent;padding:8px 12px;min-height:40px;border-radius:8px;font-weight:500}
+nav button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+#saveState{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+#saveState.dirty{color:var(--warn)}
+main{max-width:1100px;margin:0 auto;padding-block:20px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.tab{display:flex;flex-direction:column;gap:18px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:18px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel h2{margin:0;font-size:1.02rem;font-weight:600;text-wrap:balance}
+.panel h3{margin:4px 0 0;font-size:.92rem;font-weight:600}
+.panel p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.86rem}
+.mono,code{font-family:var(--mono);font-size:.9em;font-variant-numeric:tabular-nums}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.spacer{flex:1}
+button{font:inherit;font-weight:500;border-radius:8px;padding:10px 16px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);cursor:pointer;min-height:44px}
+button.ghost{background:transparent;color:var(--accent)}
+button.quiet{background:transparent;color:var(--muted);border-color:var(--line)}
+button.danger{background:transparent;color:var(--fail);border-color:var(--fail)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted);min-width:0}
+input[type=text],select,textarea{font:inherit;font-size:1rem;padding:9px 10px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);min-height:44px;max-width:100%;width:100%}
+input.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+input.bad{border-color:var(--fail)}
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;white-space:nowrap}
+td.num,th.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+td input[type=text],td select{min-height:38px;padding:6px 8px}
+.pill{display:inline-block;font-size:.76rem;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.fail{color:var(--fail)}.pill.na{color:var(--muted)}
+.note{border-left:3px solid var(--accent);background:var(--sunk);padding:10px 12px;border-radius:4px;font-size:.9rem}
+.note.warn{border-left-color:var(--warn)}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.kv div{background:var(--sunk);border-radius:8px;padding:10px 12px}
+.kv b{display:block;font-family:var(--mono);font-size:1.15rem;font-weight:500;font-variant-numeric:tabular-nums}
+.kv span{font-size:.75rem;color:var(--muted)}
+.meas-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 14px;padding:12px 0;border-bottom:1px solid var(--line)}
+.meas-row:last-child{border-bottom:0}
+.meas-row .t{font-weight:600}
+.meas-row .i{font-size:.86rem;color:var(--muted)}
+.meas-row .q{font-family:var(--mono);font-size:.78rem;color:var(--muted)}
+.meas-row .b{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:flex-start}
+@media (max-width:620px){.meas-row{grid-template-columns:1fr}.meas-row .b{justify-content:flex-start}}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:transparent;color:var(--muted);border:1px solid var(--line);padding:6px 10px;min-height:38px;border-radius:999px;font-size:.84rem;font-weight:500}
+.chip .dot{width:14px;height:3px;border-radius:2px;background:currentColor}
+.chip[aria-pressed="true"]{color:var(--fg);border-color:var(--fg)}
+.chip:disabled{opacity:.35}
+.chartbox{position:relative;width:100%;height:min(62vh,440px);min-height:300px}
+.chartbox.small{height:220px;min-height:200px}
+.chartbox canvas{width:100%;height:100%;display:block;touch-action:pan-y}
+.empty-over{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.empty-over p{background:var(--surface);border:1px solid var(--line);padding:10px 14px;border-radius:8px;color:var(--muted);max-width:40ch;text-align:center}
+#readout{font-family:var(--mono);font-size:.8rem;color:var(--muted);min-height:1.5em;font-variant-numeric:tabular-nums}
+.plan{width:100%;max-width:420px;height:auto;display:block}
+.plan text{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+details{border-top:1px solid var(--line);padding-top:8px}
+details summary{cursor:pointer;color:var(--accent);font-weight:500}
+.prob td{font-size:.88rem}
+.bar{height:8px;background:var(--accent-soft);border-radius:4px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--accent)}
+#overlay{position:fixed;inset:0;z-index:50;background:rgba(10,14,13,.72);display:flex;align-items:center;justify-content:center;padding:24px}
+#overlay .box{background:var(--surface);color:var(--fg);border-radius:14px;padding:28px;max-width:420px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px}
+#overlay .big{font-family:var(--mono);font-size:3.4rem;font-weight:500;line-height:1}
+.progress{height:6px;background:var(--sunk);border-radius:3px;overflow:hidden;border:1px solid var(--line)}
+.progress i{display:block;height:100%;width:0;background:var(--accent)}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;max-width:90vw}
+.levelbar{position:relative;height:12px;background:var(--sunk);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.levelbar i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);width:0}
+input[type=range]{width:100%;accent-color:var(--accent);min-height:36px}
+#report{display:none}
+@media print{
+  body{background:#fff;color:#000}
+  .top,main,#toast,#overlay{display:none!important}
+  #report{display:block;font-family:var(--sans);color:#000;font-size:11pt}
+  #report h1{font-size:18pt;margin:0 0 4pt}
+  #report h2{font-size:13pt;margin:14pt 0 6pt;break-after:avoid}
+  #report table{font-size:9pt}
+  #report th,#report td{border-bottom:1px solid #bbb;color:#000}
+  #report img{width:100%;break-inside:avoid}
+  #report .sec{break-inside:avoid}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">Szobaakusztika-mérő<span class="ver">v1.1</span></div>
+    <nav role="tablist" aria-label="Fülek">
+      <button role="tab" data-tab="room" aria-selected="false">Szoba</button>
+      <button role="tab" data-tab="measure" aria-selected="false">Mérés</button>
+      <button role="tab" data-tab="results" aria-selected="false">Eredmények</button>
+      <button role="tab" data-tab="advice" aria-selected="false">Javaslatok</button>
+      <button role="tab" data-tab="project" aria-selected="false">Projekt</button>
+    </nav>
+    <div id="saveState">Nincs mentés</div>
+  </div>
+</header>
+
+<main>
+<!-- ============ SZOBA ============ -->
+<section class="tab" id="tab-room" hidden>
+  <div class="note" id="exampleNote">Ezek példaadatok. Írd át a saját szobád méreteire; minden érték méterben, a hőmérséklet °C-ban.</div>
+  <div class="grid2">
+    <div class="panel">
+      <h2>Méretek</h2>
+      <div class="fields">
+        <label class="f">Hossz L (m)<input type="text" inputmode="decimal" class="num" data-path="room.L" id="rL"></label>
+        <label class="f">Szélesség W (m)<input type="text" inputmode="decimal" class="num" data-path="room.W" id="rW"></label>
+        <label class="f">Magasság H (m)<input type="text" inputmode="decimal" class="num" data-path="room.H" id="rH"></label>
+        <label class="f">Hőmérséklet (°C)<input type="text" inputmode="decimal" class="num" data-path="room.T" id="rT"></label>
+      </div>
+      <div class="kv" id="roomKV"></div>
+    </div>
+    <div class="panel">
+      <h2>Elhelyezés</h2>
+      <p class="small muted">x: távolság az elülső faltól (a hangfalak mögötti fal). y: távolság a bal oldalfaltól, a hallgatási helyről nézve. z: magasság a padlótól. A hangfalaknál a mélysugárzó közepét add meg.</p>
+      <div class="tablewrap"><table>
+        <thead><tr><th></th><th>x (m)</th><th>y (m)</th><th>z (m)</th></tr></thead>
+        <tbody>
+          <tr><td>Bal hangfal</td><td><input type="text" inputmode="decimal" class="num" data-path="room.spk.L.x" id="sLx"></td><td><input type="text" inputmode="decimal" class="num" data-path="room.spk.L.y" id="sLy"></td><td><input type="text" inputmode="decimal" class="num" data-path="room.spk.L.z" id="sLz"></td></tr>
+          <tr><td>Jobb hangfal</td><td><input type="text" inputmode="decimal" class="num" data-path="room.spk.R.x" id="sRx"></td><td><input type="text" inputmode="decimal" class="num" data-path="room.spk.R.y" id="sRy"></td><td><input type="text" inputmode="decimal" class="num" data-path="room.spk.R.z" id="sRz"></td></tr>
+          <tr><td>Hallgatási pont</td><td><input type="text" inputmode="decimal" class="num" data-path="room.lp.x" id="lpx"></td><td><input type="text" inputmode="decimal" class="num" data-path="room.lp.y" id="lpy"></td><td><input type="text" inputmode="decimal" class="num" data-path="room.lp.z" id="lpz"></td></tr>
+        </tbody>
+      </table></div>
+      <div class="fields">
+        <label class="f">Mélysugárzó effektív sugara a (m)<input type="text" inputmode="decimal" class="num" data-path="room.a" id="ra"></label>
+        <label class="f">Reflexnyílás sugara (m), 0 = nincs<input type="text" inputmode="decimal" class="num" data-path="room.rp" id="rrp"></label>
+      </div>
+      <svg class="plan" id="plan" viewBox="0 0 300 360" role="img" aria-label="Alaprajz felülnézetben"></svg>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Felületek anyaga</h2>
+    <p class="small muted">Az utózengési idő becsléséhez (Sabine). A kiegészítő elemek felülete levonódik a felület alapanyagából; az ülőhelyeknél darabszámot adj meg.</p>
+    <div class="tablewrap"><table><thead><tr><th>Felület</th><th class="num">Terület (m²)</th><th>Anyag</th></tr></thead><tbody id="surfBody"></tbody></table></div>
+    <h3>Kiegészítő elemek</h3>
+    <div class="tablewrap"><table><thead><tr><th>Elem</th><th>Mennyiség (m² vagy db)</th><th>Melyik felületen</th><th></th></tr></thead><tbody id="extraBody"></tbody></table></div>
+    <div class="row"><button class="ghost" id="addExtra">Elem hozzáadása</button></div>
+  </div>
+  <div class="panel">
+    <h2>Elemzési beállítások</h2>
+    <div class="fields">
+      <label class="f">Problémaküszöb (dB)<input type="text" inputmode="decimal" class="num" data-path="set.thr" id="sthr"></label>
+      <label class="f">0 dBFS = ? dB SPL (becsült)<input type="text" inputmode="decimal" class="num" data-path="set.splFS" id="sspl"></label>
+    </div>
+    <p class="small muted">A dB SPL érték becslés, amíg hangszintmérővel össze nem veted. A frekvenciaátvitelt és a javaslatokat nem befolyásolja.</p>
+  </div>
+</section>
+
+<!-- ============ MÉRÉS ============ -->
+<section class="tab" id="tab-measure" hidden>
+  <div class="grid2">
+    <div class="panel">
+      <h2>Mikrofon</h2>
+      <p class="small muted">Dayton iMM-6C USB-C-n; a fejhallgató-kimenete jack–2×RCA kábellel az erősítőn. A mérőjel a bal vagy a jobb csatornán szól.</p>
+      <div class="row"><button id="micBtn">Mikrofon bekapcsolása</button><select id="micSel" aria-label="Bemenet" hidden></select></div>
+      <p class="mono small" id="micStatus">Kikapcsolva</p>
+      <div class="levelbar" aria-hidden="true"><i id="micLevel"></i></div>
+    </div>
+    <div class="panel">
+      <h2>Mérőjel</h2>
+      <div class="fields">
+        <label class="f">Sweep hossza<select data-path="set.sweep" data-type="num" id="ssweep"><option value="3">3 s</option><option value="5">5 s</option><option value="10">10 s</option></select></label>
+        <label class="f">Elemzési ablak<select data-path="set.win" data-type="num" id="swin"><option value="300">300 ms</option><option value="500">500 ms</option><option value="1000">1000 ms</option></select></label>
+      </div>
+      <label class="f">Kimeneti szint: <span class="mono" id="levelVal"></span><input type="range" min="-30" max="-3" step="1" data-path="set.level" data-type="num" id="slevel"></label>
+      <p class="small muted">Hosszabb sweep jobb jel-zaj viszonyt ad mélyben. A hangerőt az erősítőn állítsd, a kimeneti szint maradjon −10 dBFS körül.</p>
+    </div>
+  </div>
+  <div class="panel">
+    <h2>Szintpróba</h2>
+    <p class="small muted">Rövid, 2 s-os sweep. Megmutatja a túlvezérlést, a jel-zaj viszonyt és a torzítást. Közeltéri mérés előtt mindig futtasd le újra, halkabb beállítással.</p>
+    <div class="row">
+      <div class="chips" role="group" aria-label="Csatorna"><button class="chip" data-probe="L" aria-pressed="true">Bal</button><button class="chip" data-probe="R" aria-pressed="false">Jobb</button></div>
+      <button id="probeBtn" disabled>Szintpróba</button>
+    </div>
+    <div id="probeRes" class="small muted">Még nem futott.</div>
+  </div>
+  <div class="panel">
+    <h2>Mérési terv</h2>
+    <p class="small muted">Javasolt sorrend: közeltér (halkan) → hallgatási pont. A hallgatási pontnál több pontot is felvehetsz a fej körül; a program energiaátlagot számol.</p>
+    <div id="measList"></div>
+  </div>
+</section>
+
+<!-- ============ EREDMÉNYEK ============ -->
+<section class="tab" id="tab-results" hidden>
+  <div class="panel">
+    <div class="row">
+      <h2>Frekvenciaátvitel</h2><span class="spacer"></span>
+      <div class="chips" role="group" aria-label="Tartomány"><button class="chip" data-range="full">20 Hz–20 kHz</button><button class="chip" data-range="low">20–500 Hz</button></div>
+      <label class="f" style="flex-direction:row;align-items:center;gap:8px">Simítás
+        <select id="smoothSel" style="width:auto"><option value="0.0208333">nyers</option><option value="0.0833333">1/12 okt.</option><option value="0.1666667">1/6 okt.</option><option value="0.3333333">1/3 okt.</option></select></label>
+    </div>
+    <div class="chips" id="curveChips"></div>
+    <div class="chips" id="markChips">
+      <button class="chip" data-mark="modes">Módusok</button>
+      <button class="chip" data-mark="sbir">SBIR</button>
+      <button class="chip" data-mark="lines">Schroeder / közeltér határa</button>
+      <button class="chip" data-mark="probs">Problémák</button>
+    </div>
+    <div class="chartbox"><canvas id="chart" aria-label="Frekvenciaátviteli grafikon"></canvas><div class="empty-over" id="chartEmpty"><p>Még nincs mérés. A függőleges jelölők a szoba méreteiből számított módusok.</p></div></div>
+    <div id="readout">Koppints a grafikonra az értékek kiolvasásához.</div>
+  </div>
+  <div class="panel" id="diffPanel" hidden>
+    <h2>Változás az összehasonlító méréshez képest</h2>
+    <p class="small muted">Most − korábbi, hallgatási pont, 1/6 oktáv simítással. Pozitív érték: most hangosabb.</p>
+    <div class="chartbox small"><canvas id="diffChart" aria-label="Különbséggörbe"></canvas></div>
+  </div>
+</section>
+
+<!-- ============ JAVASLATOK ============ -->
+<section class="tab" id="tab-advice" hidden>
+  <div class="panel"><h2>Összefoglaló</h2><div class="kv" id="advKV"></div><div id="advNotes"></div></div>
+  <div id="advChannels" class="grid2"></div>
+  <div class="panel"><h2>Utózengési idő és szükséges elnyelés</h2>
+    <p class="small muted">Sabine-becslés a felületekből. Célérték az EBU Tech 3276 szerint: T = 0,25·(V/100 m³)^(1/3) s.</p>
+    <div class="tablewrap"><table id="rtTable"></table></div></div>
+  <div class="grid2">
+    <div class="panel"><h2>Első visszaverődési pontok</h2><p class="small muted">Ide kerül a szélessávú porózus abszorber. Ellenőrzés tükörrel: a hallgatási pontból nézve a tükörben a hangfal látszik.</p><div class="tablewrap"><table id="reflTable"></table></div></div>
+    <div class="panel"><h2>Hangfal–határfelület interferencia</h2><p class="small muted">Első völgy f = c/(4d), második 3c/(4d).</p><div class="tablewrap"><table id="sbirTable"></table></div></div>
+  </div>
+  <div class="panel"><h2>Szobamódusok a Schroeder-frekvenciáig</h2>
+    <p class="small muted">Ferde módusok 150 Hz-ig. Csatolás: a módus amplitúdója a hangfalnál × a hallgatási pontnál. Minél nagyobb, annál erősebben hallod.</p>
+    <div class="tablewrap"><table id="modeTable"></table></div></div>
+</section>
+
+<!-- ============ PROJEKT ============ -->
+<section class="tab" id="tab-project" hidden>
+  <div class="grid2">
+    <div class="panel">
+      <h2>Projekt</h2>
+      <label class="f">Név<input type="text" data-path="name" id="pname"></label>
+      <label class="f">Megjegyzés<textarea data-path="notes" id="pnotes" rows="3"></textarea></label>
+      <div class="row">
+        <button id="saveBtn">Projekt mentése</button>
+        <button class="ghost" id="openBtn">Projekt megnyitása</button>
+        <button class="danger" id="newBtn">Új projekt</button>
+      </div>
+      <input type="file" id="openFile" accept=".json,application/json" hidden>
+      <p class="small muted">A mentés egy .json fájl a mérésekkel és a szobaadatokkal. iPaden a megosztás ablakban válaszd a „Mentés a Fájlokba” lehetőséget.</p>
+      <p class="small mono" id="autosaveInfo"></p>
+    </div>
+    <div class="panel">
+      <h2>Előtte–utána</h2>
+      <p class="small muted">Tölts be egy korábbi projektfájlt: a görbéi szaggatottan jelennek meg, és a program kiszámolja a változást.</p>
+      <div class="row"><button class="ghost" id="cmpBtn">Összehasonlító betöltése</button><button class="quiet" id="cmpClear" hidden>Eltávolítás</button></div>
+      <input type="file" id="cmpFile" accept=".json,application/json" hidden>
+      <p class="small mono" id="cmpInfo">Nincs betöltve.</p>
+    </div>
+    <div class="panel">
+      <h2>Export</h2>
+      <div class="row"><button class="ghost" id="csvBtn">CSV export</button><button class="ghost" id="repBtn">Jelentés (PDF)</button></div>
+      <p class="small muted">CSV: pontosvesszővel tagolt, tizedesvesszős, magyar Excelhez. Jelentés: a nyomtatás ablakban válaszd a PDF-mentést (iPaden: Megosztás → Mentés a Fájlokba).</p>
+    </div>
+    <div class="panel">
+      <h2>Mikrofon kalibráció</h2>
+      <p class="small" id="calInfo"></p>
+      <label class="row small"><input type="checkbox" id="calOn" style="width:22px;height:22px"> Kalibráció alkalmazása</label>
+      <div class="row"><button class="ghost" id="calBtn">Másik kalibrációs fájl</button><button class="quiet" id="calReset">Beépített visszaállítása</button></div>
+      <input type="file" id="calFile" accept=".txt,.cal,.frd,text/plain" hidden>
+    </div>
+  </div>
+</section>
+</main>
+
+<div id="overlay" hidden><div class="box"><div class="big" id="ovBig">3</div><div id="ovText">Csend legyen!</div><div class="progress"><i id="ovProg"></i></div></div></div>
+<div id="toast" hidden></div>
+<div id="report"></div>
+
+<script type="text/plain" id="calData">
+*1000Hz	-37.2
+20.00	0.5
+20.55	0.5
+21.11	0.5
+21.69	0.5
+22.29	0.5
+22.90	0.6
+23.53	0.6
+24.18	0.6
+24.84	0.6
+25.52	0.7
+26.22	0.7
+26.94	0.7
+27.68	0.7
+28.44	0.7
+29.22	0.7
+30.03	0.7
+30.85	0.8
+31.70	0.8
+32.57	0.8
+33.46	0.8
+34.38	0.8
+35.33	0.8
+36.30	0.9
+37.29	0.9
+38.32	0.9
+39.37	0.9
+40.45	0.9
+41.56	1.0
+42.70	1.0
+43.87	1.1
+45.08	1.1
+46.32	1.1
+47.59	1.2
+48.90	1.2
+50.24	1.2
+51.62	1.2
+53.03	1.2
+54.49	1.2
+55.99	1.2
+57.52	1.2
+59.10	1.2
+60.73	1.2
+62.39	1.1
+64.11	1.0
+65.87	1.0
+67.68	1.0
+69.54	0.9
+71.44	0.9
+73.41	0.8
+75.42	0.8
+77.49	0.7
+79.62	0.7
+81.81	0.6
+84.05	0.6
+86.36	0.6
+88.73	0.6
+91.17	0.5
+93.67	0.5
+96.25	0.5
+98.89	0.5
+101.60	0.5
+104.39	0.5
+107.26	0.5
+110.21	0.5
+113.23	0.5
+116.34	0.5
+119.54	0.5
+122.82	0.5
+126.19	0.5
+129.66	0.5
+133.22	0.5
+136.87	0.5
+140.63	0.6
+144.50	0.6
+148.46	0.6
+152.54	0.6
+156.73	0.6
+161.03	0.7
+165.45	0.7
+170.00	0.7
+174.67	0.8
+179.46	0.8
+184.39	0.9
+189.45	0.9
+194.65	1.0
+200.00	1.0
+205.49	1.1
+211.13	1.1
+216.93	1.2
+222.89	1.2
+229.01	1.2
+235.30	1.2
+241.76	1.2
+248.40	1.1
+255.22	1.1
+262.23	1.1
+269.43	1.0
+276.83	0.9
+284.43	0.9
+292.24	0.9
+300.26	0.8
+308.51	0.7
+316.98	0.7
+325.68	0.6
+334.63	0.5
+343.81	0.4
+353.26	0.4
+362.96	0.3
+372.92	0.3
+383.16	0.3
+393.68	0.2
+404.49	0.2
+415.60	0.2
+427.01	0.2
+438.74	0.2
+450.79	0.3
+463.17	0.3
+475.88	0.3
+488.95	0.3
+502.38	0.3
+516.17	0.3
+530.35	0.3
+544.91	0.3
+559.87	0.4
+575.25	0.4
+591.04	0.4
+607.27	0.4
+623.95	0.4
+641.08	0.4
+658.68	0.4
+676.77	0.4
+695.35	0.4
+714.45	0.4
+734.07	0.3
+754.22	0.3
+774.94	0.2
+796.21	0.2
+818.08	0.2
+840.54	0.2
+863.62	0.1
+887.34	0.1
+911.70	0.1
+936.74	0.1
+962.46	0.1
+988.89	0.0
+1016.04	-0.0
+1043.94	-0.0
+1072.61	-0.0
+1102.06	-0.1
+1132.33	-0.1
+1163.42	-0.1
+1195.37	-0.1
+1228.19	-0.1
+1261.91	-0.2
+1296.57	-0.2
+1332.17	-0.2
+1368.75	-0.3
+1406.34	-0.4
+1444.95	-0.4
+1484.63	-0.5
+1525.40	-0.6
+1567.28	-0.6
+1610.32	-0.7
+1654.54	-0.8
+1699.97	-0.8
+1746.65	-0.9
+1794.61	-1.0
+1843.89	-1.1
+1894.53	-1.1
+1946.55	-1.2
+2000.00	-1.2
+2054.92	-1.3
+2111.35	-1.3
+2169.32	-1.4
+2228.89	-1.4
+2290.10	-1.4
+2352.98	-1.5
+2417.59	-1.5
+2483.98	-1.5
+2552.19	-1.5
+2622.27	-1.4
+2694.27	-1.4
+2768.26	-1.3
+2844.27	-1.3
+2922.37	-1.1
+3002.62	-1.0
+3085.07	-0.8
+3169.79	-0.7
+3256.83	-0.6
+3346.26	-0.5
+3438.14	-0.5
+3532.55	-0.5
+3629.56	-0.6
+3729.22	-0.6
+3831.62	-0.7
+3936.84	-0.7
+4044.94	-0.7
+4156.01	-0.7
+4270.14	-0.8
+4387.39	-0.8
+4507.87	-0.9
+4631.65	-1.0
+4758.83	-1.1
+4889.51	-1.1
+5023.77	-1.2
+5161.72	-1.2
+5303.46	-1.1
+5449.09	-0.9
+5598.72	-0.7
+5752.46	-0.5
+5910.42	-0.2
+6072.72	-0.2
+6239.47	0.4
+6410.80	0.6
+6586.84	0.6
+6767.71	0.8
+6953.55	1.0
+7144.49	1.1
+7340.67	1.2
+7542.24	1.3
+7749.35	1.4
+7962.14	1.5
+8180.78	1.6
+8405.42	1.7
+8636.23	1.7
+8873.37	1.7
+9117.03	1.7
+9367.38	1.8
+9624.61	1.8
+9888.89	1.8
+10160.44	1.8
+10439.44	1.8
+10726.10	1.7
+11020.63	1.7
+11323.25	1.6
+11634.18	1.6
+11953.65	1.6
+12281.89	1.5
+12619.15	1.4
+12965.66	1.3
+13321.69	1.2
+13687.50	1.1
+14063.35	1.0
+14449.52	0.9
+14846.30	0.7
+15253.97	0.6
+15672.84	0.6
+16103.21	0.4
+16545.39	0.3
+16999.72	0.2
+17466.52	0.2
+17946.14	0.1
+18438.94	0.1
+18945.26	0.1
+19465.49	0.0
+20000.00	-0.0
+</script>
+<script>
+/* ===== DSP és akusztikai számítások (tiszta függvények, böngésző nélkül is tesztelhetők) ===== */
+const DSP = (() => {
+  const TW = new Map();
+  function fft(re, im, inv) {
+    const n = re.length;
+    for (let i = 1, j = 0; i < n; i++) {
+      let b = n >> 1; for (; j & b; b >>= 1) j ^= b; j ^= b;
+      if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    let T = TW.get(n);
+    if (!T) { T = { c: new Float64Array(n / 2), s: new Float64Array(n / 2) };
+      for (let k = 0; k < n / 2; k++) { T.c[k] = Math.cos(2 * Math.PI * k / n); T.s[k] = Math.sin(2 * Math.PI * k / n); }
+      TW.set(n, T); }
+    const sg = inv ? 1 : -1;
+    for (let len = 2; len <= n; len <<= 1) {
+      const h = len >> 1, step = n / len;
+      for (let i = 0; i < n; i += len) {
+        for (let k = 0; k < h; k++) {
+          const wr = T.c[k * step], wi = sg * T.s[k * step], a = i + k, b = a + h;
+          const tr = re[b] * wr - im[b] * wi, ti = re[b] * wi + im[b] * wr;
+          re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+        }
+      }
+    }
+    if (inv) for (let i = 0; i < n; i++) { re[i] /= n; im[i] /= n; }
+  }
+  const np2 = n => { let p = 1; while (p < n) p <<= 1; return p; };
+
+  /* Exponenciális (logaritmikus) szinuszsweep, Farina-féle. L = T / ln(f2/f1) */
+  function sweep(fs, T, f1, f2, A) {
+    const N = Math.round(T * fs), x = new Float32Array(N), L = T / Math.log(f2 / f1);
+    const fi = Math.round(0.05 * fs), fo = Math.round(0.01 * fs);
+    for (let i = 0; i < N; i++) {
+      const t = i / fs; let w = 1;
+      if (i < fi) w = 0.5 - 0.5 * Math.cos(Math.PI * i / fi);
+      else if (i > N - fo) w = 0.5 - 0.5 * Math.cos(Math.PI * (N - i) / fo);
+      x[i] = A * w * Math.sin(2 * Math.PI * f1 * L * (Math.exp(t / L) - 1));
+    }
+    return { x, L, f1, f2, T, A };
+  }
+
+  /* Dekonvolúció regularizált spektrális osztással: H = R·S* / (|S|² + ε). Kör-impulzusválasz, N hosszú. */
+  function deconv(rec, sw, f1, f2, fs) {
+    const N = np2(rec.length + sw.length);
+    const rr = new Float64Array(N), ri = new Float64Array(N), sr = new Float64Array(N), si = new Float64Array(N);
+    rr.set(rec); sr.set(sw); fft(rr, ri, false); fft(sr, si, false);
+    const k1 = Math.ceil(f1 * 1.2 * N / fs), k2 = Math.floor(f2 / 1.05 * N / fs);
+    let mn = Infinity;
+    for (let k = k1; k <= k2; k++) { const p = sr[k] * sr[k] + si[k] * si[k]; if (p < mn) mn = p; }
+    const eps = mn * 0.01;
+    for (let k = 0; k < N; k++) {
+      const p = sr[k] * sr[k] + si[k] * si[k] + eps, a = rr[k], b = ri[k];
+      rr[k] = (a * sr[k] + b * si[k]) / p; ri[k] = (b * sr[k] - a * si[k]) / p;
+    }
+    fft(rr, ri, true);
+    return rr;
+  }
+
+  /* Felvétel kiértékelése: impulzusválasz, jel-zaj viszony, harmonikus torzítás, túlvezérlés */
+  function analyseRecording(x, S, e0, fs) {
+    let pk = 0; for (let i = 0; i < x.length; i++) { const v = Math.abs(x[i]); if (v > pk) pk = v; }
+    const n0 = Math.max(0, e0 - Math.round(0.6 * fs)), n1 = Math.max(n0 + 1, e0 - Math.round(0.05 * fs));
+    let ss = 0; for (let i = n0; i < n1; i++) ss += x[i] * x[i];
+    const noiseDb = 20 * Math.log10(Math.sqrt(ss / (n1 - n0)) * Math.SQRT2 + 1e-12);
+    const h = DSP.deconv(x, S.x, S.f1, S.f2, fs), N = h.length;
+    const wrap = i => ((i % N) + N) % N;
+    const E = (a, b) => { let s = 0; for (let i = a; i < b; i++) { const v = h[wrap(i)]; s += v * v; } return s; };
+    let pi = e0, pv = 0;
+    for (let i = Math.max(0, e0); i < Math.min(N, e0 + Math.round(0.5 * fs)); i++) { const v = Math.abs(h[i]); if (v > pv) { pv = v; pi = i; } }
+    const ms2 = Math.round(0.002 * fs);
+    const dt2 = S.L * Math.log(2) * fs, dt3 = S.L * Math.log(3) * fs;
+    const E1 = E(pi - ms2, pi + Math.round(0.15 * fs));
+    const w2 = Math.round(Math.min(0.15 * fs, 0.5 * dt2)), w3 = Math.round(Math.min(0.15 * fs, 0.5 * (dt3 - dt2)));
+    const E2 = E(Math.round(pi - dt2) - ms2, Math.round(pi - dt2) + w2);
+    const E3 = E(Math.round(pi - dt3) - ms2, Math.round(pi - dt3) + w3);
+    const thd = 10 * Math.log10((E2 + E3) / E1 + 1e-15);
+    const tA = pi + Math.round(1.0 * fs), tB = pi + Math.round(1.4 * fs);
+    const nP = E(tA, tB) / (tB - tA);
+    const L50 = Math.round(0.05 * fs) + ms2;
+    const snr = 10 * Math.log10(E(pi - ms2, pi + Math.round(0.05 * fs)) / (nP * L50 + 1e-30));
+    const keep = Math.round(1.25 * fs);
+    const ir = new Float32Array(keep);
+    for (let i = 0; i < keep; i++) ir[i] = h[wrap(e0 + i)];
+    return { ir, fs, peak: pi - e0, latencyMs: (pi - e0) / fs * 1000, noiseDb, peakDb: 20 * Math.log10(pk + 1e-12), clip: pk >= 0.99, thd, snr };
+  }
+
+  /* Ablakolt spektrum: start-tól winLen mintán, elején preLen félhann felfutás, végén 20% lecsengés */
+  function spectrum(ir, fs, start, winLen, preLen) {
+    const N = np2(Math.max(65536, winLen));
+    const re = new Float64Array(N), im = new Float64Array(N);
+    const fall = Math.max(1, Math.round(winLen * 0.2));
+    for (let i = 0; i < winLen; i++) {
+      const j = start + i; if (j < 0 || j >= ir.length) continue;
+      let w = 1;
+      if (i < preLen) w = 0.5 - 0.5 * Math.cos(Math.PI * i / preLen);
+      else if (i > winLen - fall) w = 0.5 + 0.5 * Math.cos(Math.PI * (i - (winLen - fall)) / fall);
+      re[i] = ir[j] * w;
+    }
+    fft(re, im, false);
+    return { re, im, N, df: fs / N };
+  }
+
+  /* Logaritmikus frekvenciarács */
+  function grid(f1, f2, ppo) {
+    const n = Math.floor(ppo * Math.log2(f2 / f1)) + 1, g = new Float64Array(n);
+    for (let i = 0; i < n; i++) g[i] = f1 * Math.pow(2, i / ppo);
+    return g;
+  }
+  /* Törtoktávos simítás teljesítményátlaggal (pow: 0..N/2 binek) */
+  function smoothPow(pow, df, G, frac) {
+    const M = pow.length, cs = new Float64Array(M + 1);
+    for (let k = 0; k < M; k++) cs[k + 1] = cs[k] + pow[k];
+    const out = new Float64Array(G.length), h = Math.pow(2, frac / 2);
+    for (let i = 0; i < G.length; i++) {
+      const fc = G[i], k1 = Math.ceil(fc / h / df), k2 = Math.min(M - 1, Math.floor(fc * h / df));
+      if (k2 >= k1) out[i] = (cs[k2 + 1] - cs[k1]) / (k2 - k1 + 1);
+      else { const x = fc / df, k = Math.min(M - 2, Math.floor(x)), t = x - k; out[i] = pow[k] * (1 - t) + pow[k + 1] * t; }
+    }
+    return out;
+  }
+
+  /* Kalibrációs fájl értelmezése: "*1000Hz -37.2" fejléc + frekvencia/dB párok */
+  function parseCal(text) {
+    const pts = []; let sens = null;
+    text.split(/\r?\n/).forEach(line => {
+      const s = line.trim(); if (!s) return;
+      const m = s.match(/^\*?\s*"?([\d.]+)\s*Hz"?\s+([-+\d.]+)/i);
+      if (s.startsWith('*') && m) { sens = { f: +m[1], db: +m[2] }; return; }
+      const p = s.split(/[\s,;]+/).map(Number);
+      if (p.length >= 2 && isFinite(p[0]) && isFinite(p[1]) && p[0] > 0) pts.push([p[0], p[1]]);
+    });
+    pts.sort((a, b) => a[0] - b[0]);
+    return { pts, sens };
+  }
+  function calAt(cal, f) {
+    const p = cal.pts; if (!p.length) return 0;
+    if (f <= p[0][0]) return p[0][1];
+    if (f >= p[p.length - 1][0]) return p[p.length - 1][1];
+    let lo = 0, hi = p.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (p[m][0] <= f) lo = m; else hi = m; }
+    const t = Math.log(f / p[lo][0]) / Math.log(p[hi][0] / p[lo][0]);
+    return p[lo][1] + t * (p[hi][1] - p[lo][1]);
+  }
+
+  /* ---- Szobaakusztika ---- */
+  const soundSpeed = T => 331.3 + 0.606 * T;                       // m/s
+  function modes(room, c, fmax) {
+    const out = [], { L, W, H } = room;
+    const nx = Math.floor(2 * fmax * L / c), ny = Math.floor(2 * fmax * W / c), nz = Math.floor(2 * fmax * H / c);
+    for (let i = 0; i <= nx; i++) for (let j = 0; j <= ny; j++) for (let k = 0; k <= nz; k++) {
+      if (!i && !j && !k) continue;
+      const f = c / 2 * Math.sqrt((i / L) ** 2 + (j / W) ** 2 + (k / H) ** 2);
+      if (f > fmax) continue;
+      const nz_ = (i > 0) + (j > 0) + (k > 0);
+      out.push({ f, n: [i, j, k], kind: nz_ });                     // 1 axiális, 2 tangenciális, 3 ferde
+    }
+    return out.sort((a, b) => a.f - b.f);
+  }
+  /* relatív hangnyomás amplitúdó a módusban, |cos·cos·cos| */
+  const modeP = (m, p, room) => Math.abs(Math.cos(m.n[0] * Math.PI * p.x / room.L) * Math.cos(m.n[1] * Math.PI * p.y / room.W) * Math.cos(m.n[2] * Math.PI * p.z / room.H));
+
+  /* Hangfal–határfelület interferencia: első völgy c/(4d) */
+  function sbir(spk, room, c) {
+    const s = [
+      { key: 'front', name: 'elülső fal (mögötte)', d: spk.x },
+      { key: 'left', name: 'bal oldalfal', d: spk.y },
+      { key: 'right', name: 'jobb oldalfal', d: room.W - spk.y },
+      { key: 'floor', name: 'padló', d: spk.z },
+      { key: 'ceiling', name: 'mennyezet', d: room.H - spk.z }
+    ];
+    return s.filter(o => o.d > 0.02).map(o => ({ ...o, f: c / (4 * o.d), f2: 3 * c / (4 * o.d) }));
+  }
+
+  /* Első visszaverődési pontok tükörforrás-módszerrel */
+  function firstReflections(spk, lp, room) {
+    const lerp = (a, b, t) => a + (b - a) * t, out = [];
+    let t = spk.y / (spk.y + lp.y);
+    out.push({ wall: 'bal oldalfal', x: lerp(spk.x, lp.x, t), y: 0, z: lerp(spk.z, lp.z, t) });
+    t = (room.W - spk.y) / ((room.W - spk.y) + (room.W - lp.y));
+    out.push({ wall: 'jobb oldalfal', x: lerp(spk.x, lp.x, t), y: room.W, z: lerp(spk.z, lp.z, t) });
+    t = (room.H - spk.z) / ((room.H - spk.z) + (room.H - lp.z));
+    out.push({ wall: 'mennyezet', x: lerp(spk.x, lp.x, t), y: lerp(spk.y, lp.y, t), z: room.H });
+    t = spk.z / (spk.z + lp.z);
+    out.push({ wall: 'padló', x: lerp(spk.x, lp.x, t), y: lerp(spk.y, lp.y, t), z: 0 });
+    return out;
+  }
+
+  return { fft, np2, sweep, deconv, analyseRecording, spectrum, grid, smoothPow, parseCal, calAt, soundSpeed, modes, modeP, sbir, firstReflections };
+})();
+if (typeof module !== 'undefined') module.exports = DSP;
+
+/* ===== Elemzés és kezelési javaslatok (tiszta függvények) ===== */
+const ACOU = (() => {
+  const BANDS = [125, 250, 500, 1000, 2000, 4000];
+  /* Tipikus táblázati elnyelési tényezők (α) oktávsávonként; darabos elemeknél egyenértékű elnyelési felület m²/db */
+  const MATS = {
+    plaster: { n: 'Vakolt fal (tégla, beton)', a: [.02, .02, .02, .03, .04, .05] },
+    drywall: { n: 'Gipszkarton, légréssel', a: [.29, .10, .05, .04, .07, .09] },
+    wood_panel: { n: 'Fa lambéria', a: [.19, .14, .09, .06, .06, .05] },
+    parquet: { n: 'Parketta / laminált padló', a: [.04, .04, .07, .06, .06, .07] },
+    tile: { n: 'Csempe / kő', a: [.01, .01, .01, .01, .02, .02] },
+    carpet_thin: { n: 'Vékony szőnyeg', a: [.02, .06, .14, .37, .60, .65] },
+    carpet_thick: { n: 'Vastag szőnyeg alátéttel', a: [.08, .24, .57, .69, .71, .73] },
+    window: { n: 'Ablak (üveg)', a: [.35, .25, .18, .12, .07, .04] },
+    door: { n: 'Fa ajtó', a: [.14, .10, .06, .08, .10, .10] },
+    curtain: { n: 'Nehéz függöny, redőzve', a: [.14, .35, .55, .72, .70, .65] },
+    bookshelf: { n: 'Teli könyvespolc (homlokfelület)', a: [.30, .40, .40, .30, .30, .20] },
+    wool50: { n: 'Ásványgyapot 50 mm, falon', a: [.18, .70, .95, .99, .99, .99] },
+    wool100: { n: 'Ásványgyapot 100 mm, falon', a: [.50, .95, .99, .99, .99, .99] },
+    seat: { n: 'Kárpitozott ülőhely (db)', piece: true, a: [.20, .40, .60, .70, .70, .70] }
+  };
+  const SURF = [
+    { key: 'front', n: 'Elülső fal (a hangfalak mögött)', area: r => r.W * r.H },
+    { key: 'back', n: 'Hátsó fal', area: r => r.W * r.H },
+    { key: 'left', n: 'Bal oldalfal', area: r => r.L * r.H },
+    { key: 'right', n: 'Jobb oldalfal', area: r => r.L * r.H },
+    { key: 'floor', n: 'Padló', area: r => r.L * r.W },
+    { key: 'ceiling', n: 'Mennyezet', area: r => r.L * r.W }
+  ];
+
+  /* Sabine: T60 = 0,161·V / A, A = Σ S·α */
+  function sabine(room) {
+    const V = room.L * room.W * room.H;
+    const A = BANDS.map(() => 0);
+    const used = {}; SURF.forEach(s => used[s.key] = 0);
+    (room.extras || []).forEach(e => {
+      const m = MATS[e.mat]; if (!m || !(e.qty > 0)) return;
+      if (!m.piece && used[e.surf] !== undefined) used[e.surf] += e.qty;
+      BANDS.forEach((_, b) => A[b] += e.qty * m.a[b]);
+    });
+    SURF.forEach(s => {
+      const m = MATS[room.surfaces[s.key]] || MATS.plaster;
+      const S = Math.max(0, s.area(room) - used[s.key]);
+      BANDS.forEach((_, b) => A[b] += S * m.a[b]);
+    });
+    const T = A.map(a => 0.161 * V / Math.max(a, 1e-6));
+    const Ttarget = 0.25 * Math.cbrt(V / 100);                       // EBU Tech 3276
+    const Tmid = (T[2] + T[3]) / 2;
+    const fS = 2000 * Math.sqrt(Tmid / V);
+    const need = BANDS.map((f, b) => {
+      const dA = 0.161 * V / Ttarget - A[b];
+      return { f, A: A[b], T: T[b], dA, wool: dA > 0 ? dA / MATS.wool50.a[b] : 0 };
+    });
+    return { V, A, T, Ttarget, Tmid, fS, need, S: SURF.reduce((s, x) => s + x.area(room), 0) };
+  }
+
+  /* Robusztus trend: mozgó medián ±half rácspont (½ oktáv), a keskeny csúcsok és völgyek nem húzzák el */
+  function trend(y, half) {
+    const n = y.length, out = new Float64Array(n).fill(NaN);
+    for (let i = 0; i < n; i++) {
+      const v = [];
+      for (let j = Math.max(0, i - half); j <= Math.min(n - 1, i + half); j++) if (isFinite(y[j])) v.push(y[j]);
+      if (v.length) { v.sort((a, b) => a - b); out[i] = v[v.length >> 1]; }
+    }
+    return out;
+  }
+  /* Problémák keresése.
+     Szobahatás alap (van közeltér): a referencia ÁLLANDÓ – a szobahatás medián szintje a vizsgált sávban –,
+     mert az ideális szoba nem színez; így a széles (akár oktávnyi) kiemelés is látszik.
+     Csak hallgatási pont: a hangfal saját lefutása ismeretlen, ezért ±1 oktávos mozgó medián a referencia. */
+  function detect(o) {
+    const { G, PPO, lp12, lpR, lpO, nf12, nfR, nfO, fm, thr } = o;
+    const gi = f => Math.max(0, Math.min(G.length - 1, Math.round(PPO * Math.log2(f / G[0]))));
+    const med = (y, a, b) => { const v = []; for (let i = gi(a); i <= gi(b); i++) if (isFinite(y[i])) v.push(y[i]); v.sort((x, z) => x - z); return v.length ? v[v.length >> 1] : 0; };
+    let basis = 'lp', d, raw, fLim, fLow = 20, ref = 0;
+    if (nf12) {
+      basis = 'room'; fLim = Math.min(fm, 500);
+      const m = med(nfO, 100, 400); for (let i = 0; i < G.length; i++) if (nfO[i] >= m - 15) { fLow = G[i]; break; }
+      fLow = Math.max(20, fLow);
+      const x12 = lp12.map((v, i) => v - nf12[i]);
+      ref = med(x12, fLow, fLim);
+      d = x12.map(v => v - ref);
+      raw = lpR.map((v, i) => v - nfR[i]);
+    } else {
+      fLim = 500;
+      const m = med(lpO, 100, 400); for (let i = 0; i < G.length; i++) if (lpO[i] >= m - 10) { fLow = G[i]; break; }
+      fLow = Math.max(20, fLow);
+      const tr = trend(lp12, PPO); d = lp12.map((v, i) => v - tr[i]); raw = lpR;
+    }
+    const ext = findExtrema(G, d, gi(fLow), gi(fLim), thr, PPO).map(p => {
+      const Q = qFactor(G, raw, p, PPO);
+      let i1 = p.i, i2 = p.i; const half = p.db / 2;          // szélesség a fél eltérésnél (oktávban)
+      while (i1 > 0 && Math.sign(d[i1 - 1] - half) === Math.sign(p.db)) i1--;
+      while (i2 < G.length - 1 && Math.sign(d[i2 + 1] - half) === Math.sign(p.db)) i2++;
+      return { ...p, Q, bw: (i2 - i1 + 1) / PPO, f1: G[i1], f2: G[i2] };
+    });
+    let speaker = [];
+    if (nf12) { const trn = trend(nf12, PPO / 2), dn = nf12.map((v, i) => v - trn[i]); speaker = findExtrema(G, dn, gi(fLow), gi(Math.min(fm, 800)), thr, PPO); }
+    return { basis, d, ref, ext, fLow, fLim, speaker };
+  }
+  /* Szélsőértékek keresése: d = görbe − trend; küszöb thr dB */
+  function findExtrema(G, d, iLo, iHi, thr, ppo) {
+    const out = [];
+    for (let i = Math.max(iLo, 1); i < Math.min(iHi, G.length - 1); i++) {
+      if (!isFinite(d[i])) continue;
+      if (d[i] >= thr && d[i] >= d[i - 1] && d[i] > d[i + 1]) out.push({ i, f: G[i], db: d[i], type: 'peak' });
+      if (d[i] <= -thr && d[i] <= d[i - 1] && d[i] < d[i + 1]) out.push({ i, f: G[i], db: d[i], type: 'dip' });
+    }
+    const gap = Math.round(ppo / 6), res = [];
+    out.sort((a, b) => Math.abs(b.db) - Math.abs(a.db)).forEach(p => {
+      if (!res.some(q => q.type === p.type && Math.abs(q.i - p.i) < gap)) res.push(p);
+    });
+    return res.sort((a, b) => a.f - b.f);
+  }
+  /* Jósági tényező a −3 dB-es (völgynél +3 dB-es) szélességből a nyers görbén */
+  function qFactor(G, raw, p, ppo) {
+    const sgn = p.type === 'peak' ? 1 : -1, win = Math.round(ppo / 6);
+    let c = p.i;
+    for (let i = Math.max(0, p.i - win); i <= Math.min(G.length - 1, p.i + win); i++) if (sgn * raw[i] > sgn * raw[c]) c = i;
+    const ref = raw[c] - sgn * 3, lim = ppo;
+    let lo = null, hi = null;
+    for (let i = c; i >= Math.max(0, c - lim); i--) if (sgn * (raw[i] - ref) <= 0) { lo = i; break; }
+    for (let i = c; i <= Math.min(G.length - 1, c + lim); i++) if (sgn * (raw[i] - ref) <= 0) { hi = i; break; }
+    if (lo === null || hi === null || hi <= lo) return null;
+    return G[c] / (G[hi] - G[lo]);
+  }
+
+  const AXIS = ['x', 'y', 'z'], DIM = ['L', 'W', 'H'];
+  const modeName = m => `(${m.n.join(',')}) ${['', 'axiális', 'tangenciális', 'ferde'][m.kind]}`;
+  function modePlace(m) {
+    if (m.kind === 1) {
+      if (m.n[0]) return 'az elülső és a hátsó fal mentén (a hosszirányú módusnak a két végfalnál van duzzadóhelye)';
+      if (m.n[1]) return 'a két oldalfal mentén';
+      return 'a padlón vagy a mennyezeten';
+    }
+    return 'a szoba sarkaiban (minden módusnak a sarokban van duzzadóhelye)';
+  }
+  /* Membránabszorber: f0 ≈ 60 / √(m·d) → m = (60/f0)² / d */
+  function membrane(f0) {
+    const opts = [0.05, 0.08, 0.10, 0.15, 0.20, 0.25];
+    for (const d of opts) {
+      const m = (60 / f0) ** 2 / d, t = m / 750 * 1000;          // MDF ρ ≈ 750 kg/m³
+      if (t >= 3 && t <= 19) return { d, m, t, ok: true };
+    }
+    const d = 0.25, m = (60 / f0) ** 2 / d;
+    return { d, m, t: m / 750 * 1000, ok: false };
+  }
+  /* Helmholtz-rezonátor: f0 = c/2π · √(S / (V·(l + 1,7r))) → l = S/(V·k²) − 1,7r */
+  /* Perforált lemezes rezonátor: f0 = c/2π · √(P / (D·(t + 1,6r))) → P = k²·D·(t + 1,6r) */
+  function perforated(f0, c) {
+    const k = 2 * Math.PI * f0 / c, t = 0.012, r = 0.004;
+    for (const D of [0.05, 0.08, 0.10, 0.15, 0.20]) {
+      const P = k * k * D * (t + 1.6 * r);
+      if (P >= 0.005 && P <= 0.15) return { D, P, t, r, a: Math.sqrt(Math.PI * r * r / P) };
+    }
+    return null;
+  }
+  function helmholtz(f0, c) {
+    const k = 2 * Math.PI * f0 / c;
+    for (const r of [0.04, 0.03, 0.02, 0.0125]) for (const V of [0.02, 0.03, 0.05, 0.08, 0.12, 0.2]) {
+      const S = Math.PI * r * r, l = S / (V * k * k) - 1.7 * r;
+      if (l >= 0.03 && l <= 0.4) return { r, V, l };
+    }
+    return null;
+  }
+  /* Völgy csomópontból: legkisebb elmozdulás egy tengely mentén, hogy a módus amplitúdója ≥ 0,7 legyen */
+  function moveForMode(m, lp, room) {
+    const cur = DSP.modeP(m, lp, room); let best = null;
+    m.n.forEach((n, a) => {
+      if (!n) return;
+      const D = room[DIM[a]], p0 = lp[AXIS[a]];
+      for (let s = 0.01; s <= 1.5; s += 0.01) for (const sg of [1, -1]) {
+        const p = p0 + sg * s; if (p < 0.3 || p > D - 0.3) continue;
+        const q = { ...lp, [AXIS[a]]: p }, v = DSP.modeP(m, q, room);
+        if (v >= Math.max(0.5, cur * 2) && (!best || s < best.s)) best = { axis: a, s, sg, from: p0, to: p, cur, v };
+      }
+    });
+    return best;
+  }
+  const dirWord = (axis, sg) => [['hátrébb (távolabb a hangfalaktól)', 'előrébb (közelebb a hangfalakhoz)'], ['jobbra', 'balra'], ['magasabbra', 'alacsonyabbra']][axis][sg > 0 ? 0 : 1];
+  const nf = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',');
+
+  /* Egy probléma osztályozása és javaslat */
+  function classify(p, ctx) {
+    const { room, c, spk, lp, modeList, sb, fS, refl } = ctx;
+    const tol = Math.max(0.05 * p.f, 2);
+    const cands = modeList.filter(m => m.kind < 3 && Math.abs(m.f - p.f) <= tol).map(m => ({ m, pl: DSP.modeP(m, lp, room), ps: DSP.modeP(m, spk, room) }));
+    const sbc = p.type === 'dip' ? sb.filter(s => Math.abs(s.f - p.f) <= Math.max(0.08 * p.f, 3)) : [];
+    const R = { ...p, rec: [], cause: '', key: 'unknown' };
+    if (p.f > fS * 1.2) {
+      R.key = 'refl'; R.cause = `A Schroeder-frekvencia (${nf(fS, 0)} Hz) fölött: korai visszaverődés vagy a szoba elnyelése`;
+      R.rec.push(`Szélessávú porózus abszorber az első visszaverődési pontokra (ezen a frekvencián λ/4 = ${nf(c / (4 * p.f) * 100, 0)} cm; az anyag és mögötte a légrés együtt érje el): ` +
+        refl.map(r => `${r.wall} x = ${nf(r.x, 2)} m`).join('; ') + '.');
+      return R;
+    }
+    const bwTxt = p.bw ? ` (${nf(p.f1, 0)}–${nf(p.f2, 0)} Hz, ${nf(p.bw, 1)} oktáv széles)` : '';
+    if (p.type === 'peak' && p.bw >= 0.5) {
+      const inBand = modeList.filter(m => m.kind < 3 && m.f >= p.f1 && m.f <= p.f2);
+      const near = sb.filter(s => s.key === 'front' || s.key === 'floor');
+      R.key = 'broad';
+      R.cause = `Széles mélyhang-kiemelés${bwTxt}: több módus együtt (${inBand.length} db a sávban) és a hangfal közeli falak okozta határfelület-erősítés`;
+      R.rec.push(`Szélessávú mélyabszorber a sarkokban (az elülső fal két sarka az elsődleges): legalább ${nf(Math.min(30, c / (4 * p.f) * 100 / 2), 0)} cm vastag ásványgyapot vagy szálas töltet, a sarokban teljes magasságban. Porózus anyagnál a vastagság és a légrés együtt számít; λ/4 ezen a frekvencián ${nf(c / (4 * p.f) * 100, 0)} cm.`);
+      if (near.length) R.rec.push(`A hangfal a mögötte lévő faltól ${nf(near[0].d, 2)} m-re van. A faltól elhúzva (≥ 1 m) vagy szorosan a falhoz tolva a kiemelés kisebb és egyenletesebb lesz; mérj újra mindkét helyzetben.`);
+      R.rec.push(`Ha a kiemelés megmarad, egy hangolt membránabszorber a csúcsra (${nf(p.f, 0)} Hz) a sarkokba; méretezése a keskeny csúcsoknál látható módon.`);
+      return R;
+    }
+    const strong = cands.filter(o => o.pl >= 0.3 && o.ps >= 0.2);
+    if (p.type === 'peak' && strong.length) {
+      const b = strong.sort((a, b) => b.pl * b.ps / (1 + Math.abs(b.m.f - p.f) / tol) - a.pl * a.ps / (1 + Math.abs(a.m.f - p.f) / tol))[0];
+      const mb = membrane(p.f), hz = helmholtz(p.f, c);
+      R.key = 'mode'; R.match = b;
+      R.cause = `Szobamódus ${modeName(b.m)}, számított ${nf(b.m.f)} Hz (hallgatási pont: ${nf(b.pl * 100, 0)}%, hangfal: ${nf(b.ps * 100, 0)}% amplitúdó)`;
+      R.rec.push(`Hangolt mélyabszorber ${nf(p.f, 0)} Hz-re, ${modePlace(b.m)}.`);
+      R.rec.push(`Membránabszorber: ${nf(mb.d * 100, 0)} cm légrés, ${nf(mb.m)} kg/m² lemez (≈ ${nf(mb.t, 0)} mm MDF), a lemez mögött 5 cm ásványgyapot a sávszélesség növelésére.` + (mb.ok ? '' : ' Ilyen mély frekvencián a lemez nehéz; a Helmholtz-változat praktikusabb lehet.'));
+      const pf = perforated(p.f, c);
+      if (pf) R.rec.push(`Vagy perforált lemezes rezonátor: ${nf(pf.t * 1000, 0)} mm-es lemez ${nf(pf.r * 2000, 0)} mm-es furatokkal, ${nf(pf.a * 100, 1)} cm-es négyzetes raszterben (perforáció ${nf(pf.P * 100, 1)}%), ${nf(pf.D * 100, 0)} cm légréssel, mögötte 5 cm ásványgyapot.`);
+      else if (hz) R.rec.push(`Vagy Helmholtz-rezonátor: ${nf(hz.V * 1000, 0)} literes zárt doboz, ${nf(hz.r * 200, 1)} cm belső átmérőjű és ${nf(hz.l * 100, 1)} cm hosszú nyakkal (cső).`);
+      R.rec.push('Kiindulásnak 2 egység, egyenként kb. 0,5–1 m² homlokfelülettel; utána mérj újra.');
+      return R;
+    }
+    if (p.type === 'dip') {
+      if (sbc.length) {
+        const s = sbc.sort((a, b) => Math.abs(a.f - p.f) - Math.abs(b.f - p.f))[0];
+        R.key = 'sbir'; R.match = s;
+        R.cause = `Hangfal–határfelület interferencia (SBIR): ${s.name}, távolság ${nf(s.d, 2)} m → c/(4d) = ${nf(s.f, 0)} Hz`;
+        const dNear = c / (4 * 250);
+        R.rec.push(`A hangfalat közelebb téve a felülethez (d ≤ ${nf(dNear, 2)} m) a völgy 250 Hz fölé tolódik, ahol a hangfal már irányít és kevésbé hat.`);
+        R.rec.push(`Vagy elnyelő a visszaverő felületre a hangfal mögött; hatékony vastagság λ/4 = ${nf(343 / (4 * p.f) * 100, 0)} cm, ezért mélyen inkább a távolság módosítása a reális.`);
+        return R;
+      }
+      const node = cands.filter(o => o.ps > 0.3 && o.pl < 0.5).sort((a, b) => Math.abs(a.m.f - p.f) - Math.abs(b.m.f - p.f))[0];
+      if (node && node.pl < 0.5) {
+        R.key = 'node'; R.match = node;
+        R.cause = `A hallgatási pont a ${modeName(node.m)} módus (${nf(node.m.f)} Hz) csomópontja közelében van (${nf(node.pl * 100, 0)}% amplitúdó)`;
+        const mv = moveForMode(node.m, lp, room);
+        if (mv) R.rec.push(`Helyezd a hallgatási pontot ${nf(mv.s * 100, 0)} cm-rel ${dirWord(mv.axis, mv.sg)} (${AXIS[mv.axis]}: ${nf(mv.from, 2)} → ${nf(mv.to, 2)} m). Ott ennek a módusnak az amplitúdója ${nf(mv.cur * 100, 0)}% helyett ${nf(mv.v * 100, 0)}%. Más módusok is változnak, ezért utána mérj újra.`);
+        else R.rec.push('A hallgatási pont áthelyezése segíthet; utána mérj újra.');
+        R.rec.push('A völgyet abszorber nem tölti fel, és EQ-val sem érdemes emelni: a kioltás a teljesítményt elnyeli.');
+        return R;
+      }
+    }
+    R.cause = p.type === 'peak' ? 'Nem egyezik a hallgatási pontban erős számított módussal' : 'Nem egyezik számított módussal vagy SBIR-frekvenciával';
+    if (cands.length) R.cause += ` (közeli módus: ${cands.map(o => `${modeName(o.m)} ${nf(o.m.f)} Hz, hallgatási pont ${nf(o.pl * 100, 0)}%`).join('; ')}; ellenőrizd a megadott méreteket és pozíciókat)`;
+    R.rec.push('Ismételd meg a mérést 30 cm-rel arrébb. Ha megmarad, lehetséges ok: nagy bútor, nyitott ajtó/ablak, nem téglatest alaprajz vagy hajlékony fal.');
+    return R;
+  }
+
+  return { BANDS, MATS, SURF, sabine, trend, detect, perforated, findExtrema, qFactor, classify, modeName, membrane, helmholtz, moveForMode, nf };
+})();
+if (typeof module !== 'undefined') module.exports = ACOU;
+
+/* ===== Alkalmazás ===== */
+(function () {
+'use strict';
+const $ = id => document.getElementById(id);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const nf = ACOU.nf;
+const PPO = 48, G = DSP.grid(20, 20000, PPO);
+const gi = f => Math.max(0, Math.min(G.length - 1, Math.round(PPO * Math.log2(f / 20))));
+const BUILTIN_CAL = DSP.parseCal(document.getElementById('calData').textContent);
+
+/* ---------- Projekt modell ---------- */
+function newProject() {
+  return {
+    app: 'szobaakusztika-mero', ver: 1, name: 'Hallgatószoba', notes: '', example: true, created: new Date().toISOString(),
+    room: {
+      L: 5.0, W: 3.8, H: 2.7, T: 20,
+      spk: { L: { x: 0.6, y: 0.95, z: 0.95 }, R: { x: 0.6, y: 2.85, z: 0.95 } },
+      lp: { x: 2.4, y: 1.9, z: 1.1 }, a: 0.065, rp: 0.025,
+      surfaces: { front: 'plaster', back: 'plaster', left: 'plaster', right: 'plaster', floor: 'parquet', ceiling: 'plaster' },
+      extras: [{ mat: 'window', qty: 2.0, surf: 'right' }, { mat: 'door', qty: 1.8, surf: 'back' }, { mat: 'carpet_thick', qty: 4.0, surf: 'floor' }, { mat: 'curtain', qty: 4.0, surf: 'right' }, { mat: 'bookshelf', qty: 3.0, surf: 'left' }, { mat: 'seat', qty: 3, surf: '' }]
+    },
+    set: { sweep: 5, level: -10, win: 500, thr: 6, splFS: 105, calOn: true, cal: null },
+    meas: {}
+  };
+}
+let P = newProject(), CMP = null;
+let dirty = false, dataVer = 0;
+const ui = { tab: 'room', range: 'full', smooth: 0.0833333, curves: { lpL: true, lpR: true }, marks: { modes: true, sbir: false, lines: true, probs: true }, probeCh: 'L' };
+try { Object.assign(ui, JSON.parse(localStorage.getItem('akusztika-ui') || '{}')); } catch (e) {}
+const saveUI = () => { try { localStorage.setItem('akusztika-ui', JSON.stringify(ui)); } catch (e) {} };
+
+/* ---------- Segédek ---------- */
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 3200); }
+const getPath = (o, p) => p.split('.').reduce((a, k) => a == null ? a : a[k], o);
+function setPath(o, p, v) { const k = p.split('.'); let a = o; for (let i = 0; i < k.length - 1; i++) a = a[k[i]]; a[k[k.length - 1]] = v; }
+const parseNum = s => { const v = parseFloat(String(s).replace(',', '.').trim()); return isFinite(v) ? v : NaN; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const c0 = () => DSP.soundSpeed(P.room.T);
+const calObj = () => P.set.cal ? P.set.cal : BUILTIN_CAL;
+function markDirty() { dirty = true; renderSaveState(); scheduleAutosave(); }
+function renderSaveState() { const el = $('saveState'); el.textContent = dirty ? 'Mentetlen változások' : 'Mentve'; el.classList.toggle('dirty', dirty); }
+function pill(s, t) { return `<span class="pill ${s}">${esc(t)}</span>`; }
+
+/* ---------- Fülek ---------- */
+function showTab(t) {
+  ui.tab = t; saveUI();
+  $$('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  $$('.tab').forEach(s => s.hidden = s.id !== 'tab-' + t);
+  if (t === 'results') renderResults();
+  if (t === 'advice') renderAdvice();
+  if (t === 'room') renderRoom();
+  if (t === 'measure') renderMeasList();
+  if (t === 'project') renderProject();
+  window.scrollTo(0, 0);
+}
+$$('nav button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+/* ---------- Adatkötés ---------- */
+function bindInputs() {
+  $$('[data-path]').forEach(el => {
+    const v = getPath(P, el.dataset.path);
+    if (el.tagName === 'SELECT' || el.type === 'range') el.value = String(v);
+    else if (el.classList.contains('num')) el.value = v == null ? '' : String(v).replace('.', ',');
+    else el.value = v == null ? '' : v;
+  });
+  $('levelVal').textContent = P.set.level + ' dBFS';
+}
+$$('[data-path]').forEach(el => {
+  const ev = el.tagName === 'SELECT' ? 'change' : 'input';
+  el.addEventListener(ev, () => {
+    let v = el.value;
+    if (el.classList.contains('num') || el.dataset.type === 'num') {
+      v = parseNum(v);
+      const bad = !isFinite(v) || (el.dataset.path.startsWith('room.') && el.dataset.path !== 'room.T' && v < 0);
+      el.classList.toggle('bad', bad);
+      if (bad) return;
+    }
+    setPath(P, el.dataset.path, v);
+    if (el.dataset.path.startsWith('room.')) P.example = false;
+    if (el.dataset.path === 'set.level') $('levelVal').textContent = v + ' dBFS';
+    if (el.dataset.path === 'set.win' || el.dataset.path === 'room.rp' || el.dataset.path === 'room.a') invalidate();
+    markDirty();
+    if (ui.tab === 'room') renderRoomDerived();
+  });
+});
+
+/* ---------- Szoba fül ---------- */
+function renderRoom() {
+  bindInputs();
+  $('exampleNote').hidden = !P.example;
+  const mats = Object.entries(ACOU.MATS).filter(([, m]) => !m.piece);
+  $('surfBody').innerHTML = ACOU.SURF.map(s => `<tr><td>${s.n}</td><td class="num" data-area="${s.key}"></td><td><select data-surf="${s.key}" aria-label="${s.n} anyaga">${mats.map(([k, m]) => `<option value="${k}"${P.room.surfaces[s.key] === k ? ' selected' : ''}>${m.n}</option>`).join('')}</select></td></tr>`).join('');
+  $$('[data-surf]').forEach(el => el.addEventListener('change', () => { P.room.surfaces[el.dataset.surf] = el.value; P.example = false; markDirty(); renderRoomDerived(); }));
+  renderExtras();
+  renderRoomDerived();
+}
+function renderExtras() {
+  const all = Object.entries(ACOU.MATS);
+  $('extraBody').innerHTML = P.room.extras.map((e, i) => `<tr>
+    <td><select data-ex="${i}" data-k="mat" aria-label="Elem">${all.map(([k, m]) => `<option value="${k}"${e.mat === k ? ' selected' : ''}>${m.n}</option>`).join('')}</select></td>
+    <td><input type="text" inputmode="decimal" class="num" data-ex="${i}" data-k="qty" value="${String(e.qty).replace('.', ',')}" aria-label="Mennyiség"></td>
+    <td><select data-ex="${i}" data-k="surf" aria-label="Felület"${ACOU.MATS[e.mat].piece ? ' disabled' : ''}><option value="">—</option>${ACOU.SURF.map(s => `<option value="${s.key}"${e.surf === s.key ? ' selected' : ''}>${s.n}</option>`).join('')}</select></td>
+    <td><button class="quiet" data-exdel="${i}" aria-label="Törlés">Törlés</button></td></tr>`).join('');
+  $$('[data-ex]').forEach(el => el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
+    const e = P.room.extras[+el.dataset.ex];
+    if (el.dataset.k === 'qty') { const v = parseNum(el.value); el.classList.toggle('bad', !(v >= 0)); if (!(v >= 0)) return; e.qty = v; }
+    else e[el.dataset.k] = el.value;
+    if (el.dataset.k === 'mat') { renderExtras(); }
+    P.example = false; markDirty(); renderRoomDerived();
+  }));
+  $$('[data-exdel]').forEach(b => b.addEventListener('click', () => { P.room.extras.splice(+b.dataset.exdel, 1); markDirty(); renderExtras(); renderRoomDerived(); }));
+}
+$('addExtra').addEventListener('click', () => { P.room.extras.push({ mat: 'curtain', qty: 2, surf: 'back' }); markDirty(); renderExtras(); renderRoomDerived(); });
+
+function renderRoomDerived() {
+  const r = P.room, sb = ACOU.sabine(r), c = c0();
+  $$('[data-area]').forEach(td => { const s = ACOU.SURF.find(x => x.key === td.dataset.area); td.textContent = nf(s.area(r), 2); });
+  $('roomKV').innerHTML = [
+    [nf(sb.V, 1) + ' m³', 'térfogat V'], [nf(c, 1) + ' m/s', 'hangsebesség c'], [nf(sb.Tmid, 2) + ' s', 'becsült T60 (500 Hz–1 kHz)'],
+    [nf(sb.fS, 0) + ' Hz', 'Schroeder-frekvencia'], [nf(c / (2 * Math.PI * r.a), 0) + ' Hz', 'közeltéri mérés határa'], [nf(r.lp.x / r.L * 100, 0) + '%', 'hallgatási pont / hossz']
+  ].map(([b, s]) => `<div><b>${b}</b><span>${s}</span></div>`).join('');
+  drawPlan();
+}
+function drawPlan() {
+  const r = P.room, sv = $('plan'), pad = 26, Wv = 300 - 2 * pad, Hv = 360 - 2 * pad;
+  const s = Math.min(Wv / r.W, Hv / r.L), ox = (300 - r.W * s) / 2, oy = pad;
+  const X = y => ox + y * s, Y = x => oy + x * s;
+  const ok = [r.L, r.W, r.H].every(v => v > 0);
+  if (!ok) { sv.innerHTML = ''; return; }
+  const spk = (p, t) => `<rect x="${X(p.y) - 9}" y="${Y(p.x) - 9}" width="18" height="18" rx="2" fill="var(--surface)" stroke="var(--fg)" stroke-width="1.5"/><text x="${X(p.y)}" y="${Y(p.x) + 4}" text-anchor="middle" style="fill:var(--fg)">${t}</text>`;
+  sv.innerHTML = `<rect x="${ox}" y="${oy}" width="${r.W * s}" height="${r.L * s}" fill="var(--sunk)" stroke="var(--muted)" stroke-width="1.5"/>
+    <line x1="${ox}" y1="${oy - 1}" x2="${ox + r.W * s}" y2="${oy - 1}" stroke="var(--accent)" stroke-width="4"/>
+    <text x="150" y="${oy - 8}" text-anchor="middle">elülső fal · W = ${nf(r.W, 2)} m</text>
+    <text x="${ox - 6}" y="${oy + r.L * s / 2}" text-anchor="middle" transform="rotate(-90 ${ox - 6} ${oy + r.L * s / 2})">L = ${nf(r.L, 2)} m</text>
+    <line x1="${X(r.spk.L.y)}" y1="${Y(r.spk.L.x)}" x2="${X(r.lp.y)}" y2="${Y(r.lp.x)}" stroke="var(--c-l)" stroke-dasharray="3 3"/>
+    <line x1="${X(r.spk.R.y)}" y1="${Y(r.spk.R.x)}" x2="${X(r.lp.y)}" y2="${Y(r.lp.x)}" stroke="var(--c-r)" stroke-dasharray="3 3"/>
+    ${spk(r.spk.L, 'B')}${spk(r.spk.R, 'J')}
+    <circle cx="${X(r.lp.y)}" cy="${Y(r.lp.x)}" r="9" fill="var(--accent)"/>
+    <text x="${X(r.lp.y)}" y="${Y(r.lp.x) + 24}" text-anchor="middle">hallgató</text>`;
+}
+
+/* ---------- Mikrofon és hang ---------- */
+let ctx = null, stream = null, srcN = null, proc = null, rec = null, recStart = null, levelRms = 0, busy = false;
+const mic = { label: '', sr: null, on: false };
+function stopStream() { if (proc) { proc.disconnect(); proc.onaudioprocess = null; proc = null; } if (srcN) { srcN.disconnect(); srcN = null; } if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
+async function micOn(devId) {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!ctx) { try { ctx = new AC({ sampleRate: 44100 }); } catch (e) { ctx = new AC(); } }
+  await ctx.resume();
+  stopStream();
+  const c = { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 };
+  if (devId) c.deviceId = { exact: devId };
+  stream = await navigator.mediaDevices.getUserMedia({ audio: c, video: false });
+  const tr = stream.getAudioTracks()[0], st = tr.getSettings ? tr.getSettings() : {};
+  mic.label = tr.label || 'ismeretlen bemenet'; mic.sr = st.sampleRate || null; mic.on = true; mic.ec = st.echoCancellation;
+  srcN = ctx.createMediaStreamSource(stream);
+  proc = ctx.createScriptProcessor(2048, 1, 1);
+  proc.onaudioprocess = e => {
+    const d = e.inputBuffer.getChannelData(0); let s = 0;
+    for (let i = 0; i < d.length; i++) s += d[i] * d[i];
+    levelRms = levelRms * 0.6 + Math.sqrt(s / d.length) * 0.4;
+    if (rec) { if (recStart === null) { const pt = (typeof e.playbackTime === 'number' && e.playbackTime > 0) ? e.playbackTime : ctx.currentTime; recStart = pt - d.length / ctx.sampleRate; } rec.push(new Float32Array(d)); }
+  };
+  srcN.connect(proc); proc.connect(ctx.destination);
+  const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
+  const sel = $('micSel'); sel.innerHTML = devs.map((d, i) => `<option value="${esc(d.deviceId)}"${d.label === mic.label ? ' selected' : ''}>${esc(d.label || 'Bemenet ' + (i + 1))}</option>`).join('');
+  sel.hidden = devs.length < 2;
+  renderMic();
+}
+function renderMic() {
+  const warn = mic.on && !/imm|dayton/i.test(mic.label) ? ' · Nem az iMM-6C tűnik aktívnak!' : '';
+  $('micStatus').textContent = mic.on ? `${mic.label} · ${ctx.sampleRate} Hz${mic.sr && mic.sr !== ctx.sampleRate ? ' (mikrofon ' + mic.sr + ' Hz)' : ''}${warn}` : 'Kikapcsolva';
+  $('micBtn').textContent = mic.on ? 'Mikrofon újranyitása' : 'Mikrofon bekapcsolása';
+  $('probeBtn').disabled = !mic.on || busy;
+  renderMeasList();
+}
+(function meter() { const db = 20 * Math.log10(levelRms * Math.SQRT2 + 1e-9); $('micLevel').style.width = Math.max(0, Math.min(100, (db + 90) / 90 * 100)) + '%'; requestAnimationFrame(meter); })();
+$('micBtn').addEventListener('click', async () => {
+  if (!window.isSecureContext && location.protocol !== 'file:') toast('A mikrofonhoz HTTPS vagy helyi fájl kell.');
+  try { await micOn($('micSel').hidden ? undefined : $('micSel').value || undefined); }
+  catch (e) { $('micStatus').textContent = e.name === 'NotAllowedError' ? 'Nincs engedély. Engedélyezd a mikrofont a böngészőnek (iPad Beállítások → Edge → Mikrofon) és ennek az oldalnak.' : 'Hiba: ' + e.message; }
+});
+$('micSel').addEventListener('change', e => micOn(e.target.value).catch(err => $('micStatus').textContent = 'Hiba: ' + err.message));
+
+/* Sweep lejátszása és felvétele */
+async function runSweep(ch, T, onProg) {
+  await ctx.resume();
+  const fs = ctx.sampleRate, A = Math.pow(10, P.set.level / 20), f2 = Math.min(20000, 0.45 * fs);
+  const S = DSP.sweep(fs, T, 15, f2, A);
+  const buf = ctx.createBuffer(2, S.x.length, fs);
+  buf.getChannelData(ch === 'L' ? 0 : 1).set(S.x);
+  const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination);
+  rec = []; recStart = null;
+  const T0 = ctx.currentTime + 0.7, end = T0 + T + 1.6, t0 = ctx.currentTime;
+  src.start(T0);
+  await new Promise(res => { const iv = setInterval(() => { const p = (ctx.currentTime - t0) / (end - t0); onProg && onProg(Math.min(1, p)); if (p >= 1) { clearInterval(iv); res(); } }, 80); });
+  const blocks = rec; rec = null;
+  let n = 0; blocks.forEach(b => n += b.length);
+  const x = new Float32Array(n); let o = 0; blocks.forEach(b => { x.set(b, o); o += b.length; });
+  const e0 = Math.round((T0 - recStart) * fs);
+  await new Promise(r => setTimeout(r, 20));
+  const r = DSP.analyseRecording(x, S, e0, fs);
+  return Object.assign(r, { level: P.set.level, sweep: T, date: new Date().toISOString(), mic: mic.label });
+}
+function quality(r) {
+  if (r.clip) return ['fail', 'Túlvezérlés – halkíts'];
+  if (r.snr < 20) return ['fail', 'Kevés jel – hangosíts'];
+  if (r.thd > -20) return ['fail', 'Erős torzítás – halkíts'];
+  if (r.peakDb > -1) return ['warn', 'Határon – halkíts kicsit'];
+  if (r.snr < 35) return ['warn', 'Gyenge jel-zaj viszony'];
+  if (r.thd > -30) return ['warn', 'Torzítás – halkíts kicsit'];
+  return ['ok', 'Jó'];
+}
+const qText = r => `csúcs ${nf(r.peakDb)} dBFS · jel-zaj ${nf(r.snr, 0)} dB · torzítás ${nf(r.thd, 0)} dB · zaj ${nf(r.noiseDb, 0)} dBFS`;
+
+function overlay(on, big, text, prog) { const o = $('overlay'); o.hidden = !on; if (big !== undefined) $('ovBig').textContent = big; if (text !== undefined) $('ovText').textContent = text; if (prog !== undefined) $('ovProg').style.width = (prog * 100) + '%'; }
+async function countdown() { for (let i = 3; i > 0; i--) { overlay(true, i, 'Állj távolabb, legyen csend.', 0); await new Promise(r => setTimeout(r, 1000)); } }
+
+$$('[data-probe]').forEach(b => b.addEventListener('click', () => { ui.probeCh = b.dataset.probe; $$('[data-probe]').forEach(x => x.setAttribute('aria-pressed', x === b)); }));
+$('probeBtn').addEventListener('click', async () => {
+  if (busy || !mic.on) return; busy = true; renderMic();
+  try {
+    await countdown(); overlay(true, '…', 'Szintpróba', 0);
+    const r = await runSweep(ui.probeCh, 2, p => overlay(true, Math.round(p * 100) + '%', 'Szintpróba fut', p));
+    const [s, t] = quality(r);
+    $('probeRes').innerHTML = `${pill(s, t)} <span class="mono">${qText(r)}</span><br><span class="small muted">Becsült hangnyomás a mikrofonnál a sweep csúcsán: kb. ${nf(r.peakDb + P.set.splFS, 0)} dB SPL. Késleltetés: ${nf(r.latencyMs, 0)} ms.</span>`;
+  } catch (e) { $('probeRes').textContent = 'Hiba: ' + e.message; }
+  overlay(false); busy = false; renderMic();
+});
+
+/* ---------- Mérési terv ---------- */
+const PLAN = [
+  { key: 'nfw_L', ch: 'L', kind: 'nfw', t: 'Bal hangfal – közeltér, mélysugárzó', i: 'Mikrofon 1–2 cm-re a mélysugárzó közepétől, a membrán felé. Halkíts le, és futtass szintpróbát!' },
+  { key: 'nfp_L', ch: 'L', kind: 'nfp', t: 'Bal hangfal – közeltér, reflexnyílás', i: 'Mikrofon a nyílás síkjában, a közepén. Ha nincs reflexnyílás, hagyd ki.' },
+  { key: 'nfw_R', ch: 'R', kind: 'nfw', t: 'Jobb hangfal – közeltér, mélysugárzó', i: 'Mint a bal oldalon.' },
+  { key: 'nfp_R', ch: 'R', kind: 'nfp', t: 'Jobb hangfal – közeltér, reflexnyílás', i: 'Mint a bal oldalon.' },
+  { key: 'lp_L', ch: 'L', kind: 'lp', t: 'Bal hangfal – hallgatási pont', i: 'Mikrofon a fej helyén, fülmagasságban, a mennyezet felé fordítva. Hangerő vissza a hallgatási szintre. További pontok: 20–50 cm-re a fej körül.' },
+  { key: 'lp_R', ch: 'R', kind: 'lp', t: 'Jobb hangfal – hallgatási pont', i: 'Ugyanazokon a pontokon, mint a bal oldalnál.' }
+];
+function renderMeasList() {
+  $('measList').innerHTML = PLAN.map(p => {
+    const m = P.meas[p.key], pts = m ? m.points : [], last = pts[pts.length - 1];
+    let status = pill('na', 'Nincs mérés'), q = '';
+    if (last) { const [s, t] = quality(last); status = pill(s, (p.kind === 'lp' ? pts.length + ' pont · ' : '') + t); q = qText(last); }
+    const can = mic.on && !busy;
+    const btns = p.kind === 'lp'
+      ? `<button data-meas="${p.key}" data-mode="${pts.length ? 'add' : 'new'}" ${can ? '' : 'disabled'}>${pts.length ? 'Pont hozzáadása' : 'Mérés'}</button>${pts.length ? `<button class="quiet" data-del="${p.key}" data-last="1">Utolsó pont törlése</button>` : ''}`
+      : `<button data-meas="${p.key}" data-mode="new" ${can ? '' : 'disabled'}>${pts.length ? 'Újramérés' : 'Mérés'}</button>${pts.length ? `<button class="quiet" data-del="${p.key}">Törlés</button>` : ''}`;
+    return `<div class="meas-row"><div><div class="t">${p.t}</div><div class="i">${p.i}</div><div class="row" style="margin-top:6px">${status}<span class="q">${q}</span></div></div><div class="b">${btns}</div></div>`;
+  }).join('');
+  $$('[data-meas]').forEach(b => b.addEventListener('click', () => doMeasure(b.dataset.meas, b.dataset.mode)));
+  $$('[data-del]').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'Biztosan?'; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ''; b.textContent = b.dataset.last ? 'Utolsó pont törlése' : 'Törlés'; } }, 3000); return; }
+    const m = P.meas[b.dataset.del];
+    if (b.dataset.last && m.points.length > 1) m.points.pop(); else delete P.meas[b.dataset.del];
+    invalidate(); markDirty(); renderMeasList();
+  }));
+}
+async function doMeasure(key, mode) {
+  if (busy || !mic.on) return;
+  const p = PLAN.find(x => x.key === key); busy = true; renderMic();
+  try {
+    await countdown();
+    const r = await runSweep(p.ch, P.set.sweep, pr => overlay(true, Math.round(pr * 100) + '%', p.t, pr));
+    overlay(true, '…', 'Kiértékelés', 1);
+    if (!P.meas[key] || mode === 'new') P.meas[key] = { key, ch: p.ch, kind: p.kind, points: [] };
+    P.meas[key].points.push(r);
+    invalidate(); markDirty();
+    const [s, t] = quality(r);
+    toast(`${p.t}: ${t}`);
+  } catch (e) { toast('Hiba a mérésben: ' + e.message); }
+  overlay(false); busy = false; renderMic();
+}
+
+/* ---------- Görbék ---------- */
+let cache = new Map();
+function invalidate() { dataVer++; cache = new Map(); }
+function calPowPerBin(N, df) {
+  const k = 'cal' + N + '_' + df + '_' + (P.set.calOn ? 1 : 0) + '_' + (P.set.cal ? 'u' : 'b');
+  if (cache.has(k)) return cache.get(k);
+  const M = N / 2 + 1, a = new Float64Array(M), cal = calObj();
+  for (let i = 0; i < M; i++) a[i] = P.set.calOn ? Math.pow(10, -DSP.calAt(cal, Math.max(1, i * df)) / 20) : 1;
+  cache.set(k, a); return a;
+}
+const pre = fs => Math.round(0.005 * fs);
+function ptSpec(proj, pt, start) {
+  const fs = pt.fs, wl = Math.round(proj.set.win / 1000 * fs) + pre(fs);
+  const s = DSP.spectrum(pt.ir, fs, start, wl, pre(fs));
+  const g = calPowPerBin(s.N, s.df), amp = Math.pow(10, pt.level / 20), M = s.N / 2 + 1;
+  const re = new Float64Array(M), im = new Float64Array(M);
+  for (let i = 0; i < M; i++) { re[i] = s.re[i] * g[i] * amp; im[i] = s.im[i] * g[i] * amp; }
+  return { re, im, df: s.df };
+}
+/* teljesítményspektrum binenként (abszolút: digitális vétel dBFS, a lejátszási szinttel együtt) */
+function powBins(proj, which, ch) {
+  const id = (proj === P ? 'A' : 'B') + which + ch + proj.set.win;
+  if (cache.has(id)) return cache.get(id);
+  let res = null;
+  if (which === 'lp') {
+    const m = proj.meas['lp_' + ch];
+    if (m && m.points.length) {
+      let acc = null, df = 0;
+      m.points.forEach(pt => { const s = ptSpec(proj, pt, pt.peak - pre(pt.fs)); df = s.df; if (!acc) acc = new Float64Array(s.re.length); for (let i = 0; i < acc.length; i++) acc[i] += s.re[i] * s.re[i] + s.im[i] * s.im[i]; });
+      for (let i = 0; i < acc.length; i++) acc[i] /= m.points.length;
+      res = { pow: acc, df, n: m.points.length };
+    }
+  } else if (which === 'nf') {
+    const w = proj.meas['nfw_' + ch], pp = proj.meas['nfp_' + ch];
+    const wp = w && w.points[0], ppt = pp && pp.points[0];
+    if (wp || ppt) {
+      const ref = wp || ppt, start = ref.peak - pre(ref.fs);
+      const A = wp ? ptSpec(proj, wp, start) : null, B = ppt ? ptSpec(proj, ppt, start) : null;
+      const k = proj.room.a > 0 && proj.room.rp > 0 ? proj.room.rp / proj.room.a : 0;   // Keele: port súlya rp/a
+      const M = (A || B).re.length, pow = new Float64Array(M);
+      for (let i = 0; i < M; i++) {
+        let r = 0, j = 0;
+        if (A) { r += A.re[i]; j += A.im[i]; }
+        if (B && (A ? k > 0 : true)) { const kk = A ? k : 1; r += kk * B.re[i]; j += kk * B.im[i]; }
+        pow[i] = r * r + j * j;
+      }
+      res = { pow, df: (A || B).df, port: !!(A && B && k > 0) };
+    }
+  }
+  cache.set(id, res); return res;
+}
+function curveDb(proj, which, ch, frac) {
+  const id = 'c' + (proj === P ? 'A' : 'B') + which + ch + frac + proj.set.win + proj.set.splFS;
+  if (cache.has(id)) return cache.get(id);
+  const b = powBins(proj, which, ch); let out = null;
+  if (b) { const s = DSP.smoothPow(b.pow, b.df, G, frac); out = new Float64Array(G.length); for (let i = 0; i < G.length; i++) out[i] = 10 * Math.log10(s[i] + 1e-30) + proj.set.splFS; }
+  cache.set(id, out); return out;
+}
+const fNF = proj => DSP.soundSpeed(proj.room.T) / (2 * Math.PI * proj.room.a);
+function meanBand(y, f1, f2) { let s = 0, n = 0; for (let i = gi(f1); i <= gi(f2); i++) if (isFinite(y[i])) { s += y[i]; n++; } return n ? s / n : 0; }
+/* közeltér szintre igazítva a hallgatási ponthoz; szobahatás = LP − NFa */
+function aligned(proj, ch, frac) {
+  const lp = curveDb(proj, 'lp', ch, frac), nfc = curveDb(proj, 'nf', ch, frac);
+  if (!lp || !nfc) return null;
+  const fm = fNF(proj), a1 = 150, a2 = Math.min(700, fm * 0.9);
+  const off = meanBand(nfc, a1, a2) - meanBand(lp, a1, a2);
+  const nfa = nfc.map(v => v - off), ref = meanBand(lp, a1, a2);
+  const re = new Float64Array(G.length).fill(NaN);
+  for (let i = 0; i <= gi(fm); i++) re[i] = lp[i] - nfa[i] + ref;
+  return { nfa, re, ref, fm };
+}
+
+/* ---------- Diagram ---------- */
+const LIGHT = { '--fg': '#18201e', '--muted': '#58635f', '--surface': '#ffffff', '--c-grid': '#e2e7e5', '--c-axis': '#58635f', '--c-l': '#2b62b8', '--c-r': '#c4502a', '--c-room-l': '#2f8a5b', '--c-room-r': '#8a4bb0', '--c-mode1': 'rgba(176,38,29,.55)', '--c-mode2': 'rgba(154,98,0,.45)', '--c-mode3': 'rgba(88,99,95,.30)', '--c-sbir': 'rgba(43,98,184,.55)', '--fail': '#b0261d', '--ok': '#2c7a47', '--accent': '#1d6b74' };
+const colr = (n, light) => light ? LIGHT[n] : css(n);
+function drawChart(cv, o, light, W0, H0) {
+  const dpr = window.devicePixelRatio || 1, w = W0 || cv.clientWidth, h = H0 || cv.clientHeight;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (light) { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); } else g.clearRect(0, 0, w, h);
+  const ml = 44, mr = 10, mt = 10, mb = 26, pw = w - ml - mr, ph = h - mt - mb;
+  const lx = Math.log(o.fmax / o.fmin), X = f => ml + Math.log(f / o.fmin) / lx * pw;
+  let lo = Infinity, hi = -Infinity;
+  o.curves.forEach(c => { for (let i = gi(o.fmin); i <= gi(o.fmax); i++) { const v = c.y[i]; if (isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } });
+  if (!isFinite(lo)) { lo = o.defLo !== undefined ? o.defLo : 50; hi = o.defHi !== undefined ? o.defHi : 100; }
+  let y0 = Math.floor((lo - 3) / 5) * 5, y1 = Math.ceil((hi + 3) / 5) * 5;
+  if (y1 - y0 < 30) { const m = (y0 + y1) / 2; y0 = Math.floor((m - 15) / 5) * 5; y1 = y0 + 30; }
+  const Y = v => mt + (y1 - v) / (y1 - y0) * ph;
+  g.font = '11px ' + (css('--mono') || 'monospace'); g.lineWidth = 1;
+  const ticks = [20, 30, 40, 50, 60, 80, 100, 150, 200, 300, 400, 500, 800, 1000, 2000, 3000, 5000, 10000, 20000].filter(f => f >= o.fmin && f <= o.fmax);
+  const lab = f => f >= 1000 ? (f / 1000) + 'k' : String(f);
+  g.strokeStyle = colr('--c-grid', light); g.fillStyle = colr('--c-axis', light); g.textAlign = 'center';
+  ticks.forEach(f => { const x = X(f); g.beginPath(); g.moveTo(x, mt); g.lineTo(x, mt + ph); g.stroke(); g.fillText(lab(f), x, h - 8); });
+  const step = (y1 - y0) > 60 ? 10 : 5; g.textAlign = 'right';
+  for (let v = y0; v <= y1; v += step) { const y = Y(v); g.beginPath(); g.moveTo(ml, y); g.lineTo(ml + pw, y); g.stroke(); g.fillText(String(v), ml - 6, y + 4); }
+  g.save(); g.translate(11, mt + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.fillText(o.ylabel || 'dB', 0, 0); g.restore();
+  g.save(); g.beginPath(); g.rect(ml, mt, pw, ph); g.clip();
+  (o.vlines || []).forEach(v => { if (v.f < o.fmin || v.f > o.fmax) return; g.strokeStyle = v.color; g.lineWidth = v.w || 1; g.setLineDash(v.dash || []); g.beginPath(); g.moveTo(X(v.f), mt); g.lineTo(X(v.f), mt + ph); g.stroke(); if (v.label) { g.setLineDash([]); g.fillStyle = v.color; g.textAlign = 'left'; g.fillText(v.label, X(v.f) + 3, mt + 12); } });
+  g.setLineDash([]);
+  o.curves.forEach(c => {
+    g.strokeStyle = c.color; g.lineWidth = c.width || 2; g.setLineDash(c.dash || []); g.beginPath(); let pen = false;
+    for (let i = gi(o.fmin); i <= gi(o.fmax); i++) { const v = c.y[i]; if (!isFinite(v)) { pen = false; continue; } const x = X(G[i]), y = Y(v); if (!pen) { g.moveTo(x, y); pen = true; } else g.lineTo(x, y); }
+    g.stroke();
+  });
+  g.setLineDash([]);
+  (o.points || []).forEach(p => { if (p.f < o.fmin || p.f > o.fmax || !isFinite(p.y)) return; g.fillStyle = p.color; g.beginPath(); g.arc(X(p.f), Y(p.y), 5, 0, 7); g.fill(); g.fillStyle = colr('--fg', light); g.textAlign = 'center'; g.fillText(p.label, X(p.f), Y(p.y) + (p.up ? -9 : 17)); });
+  if (o.cross) { g.strokeStyle = colr('--fg', light); g.setLineDash([2, 3]); g.beginPath(); g.moveTo(X(o.cross), mt); g.lineTo(X(o.cross), mt + ph); g.stroke(); }
+  g.restore();
+  return { X, Y, ml, pw, fmin: o.fmin, fmax: o.fmax };
+}
+
+/* ---------- Eredmények fül ---------- */
+function curveDefs(frac) {
+  const defs = [];
+  const add = (id, label, y, color, dash, width) => defs.push({ id, label, y, color, dash, width });
+  ['L', 'R'].forEach(ch => {
+    const nm = ch === 'L' ? 'Bal' : 'Jobb', col = css(ch === 'L' ? '--c-l' : '--c-r'), rc = css(ch === 'L' ? '--c-room-l' : '--c-room-r');
+    const lp = curveDb(P, 'lp', ch, frac), al = aligned(P, ch, frac), nfc = curveDb(P, 'nf', ch, frac);
+    const n = P.meas['lp_' + ch] ? P.meas['lp_' + ch].points.length : 0;
+    add('lp' + ch, `${nm} – hallgatási pont${n > 1 ? ' (' + n + ' pont átlaga)' : ''}`, lp, col, [], 2);
+    add('nf' + ch, `${nm} – közeltér${al ? ' (szintre igazítva)' : ''}`, al ? al.nfa : nfc, col, [7, 4], 1.5);
+    add('re' + ch, `${nm} – szobahatás`, al ? al.re : null, rc, [], 2);
+    if (CMP) add('cmp' + ch, `Korábbi: ${nm} hallgatási`, curveDb(CMP, 'lp', ch, frac), col, [2, 3], 1.5);
+  });
+  return defs;
+}
+let chartState = null;
+function chartOpts(light) {
+  const frac = ui.smooth, defs = curveDefs(frac).filter(d => d.y && ui.curves[d.id]);
+  const range = ui.range === 'low' ? [20, 500] : [20, 20000];
+  const c = c0(), sb = ACOU.sabine(P.room), vlines = [];
+  if (ui.marks.modes) DSP.modes(P.room, c, 300).filter(m => m.kind === 1 || (m.kind === 2 && m.f <= Math.min(sb.fS, 150))).forEach(m => vlines.push({ f: m.f, color: colr(['', '--c-mode1', '--c-mode2', '--c-mode3'][m.kind], light), w: m.kind === 1 ? 1.5 : 1 }));
+  if (ui.marks.sbir) ['L', 'R'].forEach(ch => DSP.sbir(P.room.spk[ch], P.room, c).forEach(s => vlines.push({ f: s.f, color: colr('--c-sbir', light), dash: [4, 3] })));
+  if (ui.marks.lines) { vlines.push({ f: sb.fS, color: colr('--muted', light), dash: [6, 4], label: 'Schroeder' }); vlines.push({ f: fNF(P), color: colr('--muted', light), dash: [2, 4], label: 'közeltér határa' }); }
+  const points = [];
+  if (ui.marks.probs) ['L', 'R'].forEach(ch => {
+    const an = analyzeChannel(ch); if (!an) return;
+    const base = (an.basis === 'room' && ui.curves['re' + ch]) ? aligned(P, ch, frac).re : (ui.curves['lp' + ch] ? curveDb(P, 'lp', ch, frac) : null);
+    if (!base) return;
+    an.problems.forEach(p => points.push({ f: p.f, y: base[gi(p.f)], color: css(p.type === 'peak' ? '--fail' : '--accent') || colr('--fail', light), label: nf(p.f, 0), up: p.type === 'peak' }));
+  });
+  return { fmin: range[0], fmax: range[1], curves: defs, vlines, points, ylabel: 'dB SPL (becsült)', defLo: 50, defHi: 100 };
+}
+function renderResults() {
+  const frac = ui.smooth, defs = curveDefs(frac);
+  $('smoothSel').value = String(frac);
+  $$('[data-range]').forEach(b => b.setAttribute('aria-pressed', b.dataset.range === ui.range));
+  $$('[data-mark]').forEach(b => b.setAttribute('aria-pressed', !!ui.marks[b.dataset.mark]));
+  $('curveChips').innerHTML = defs.map(d => `<button class="chip" data-curve="${d.id}" aria-pressed="${!!ui.curves[d.id]}" ${d.y ? '' : 'disabled'} style="${d.y ? 'color:' + d.color : ''}"><span class="dot" style="background:${d.color}${d.dash && d.dash.length ? ';opacity:.6' : ''}"></span>${esc(d.label)}</button>`).join('');
+  $$('[data-curve]').forEach(b => b.addEventListener('click', () => { ui.curves[b.dataset.curve] = !ui.curves[b.dataset.curve]; saveUI(); renderResults(); }));
+  const any = defs.some(d => d.y);
+  $('chartEmpty').hidden = any;
+  chartState = drawChart($('chart'), chartOpts(false));
+  chartState.opts = null;
+  const dp = $('diffPanel'); dp.hidden = !CMP;
+  if (CMP) {
+    const curves = [];
+    ['L', 'R'].forEach(ch => { const a = curveDb(P, 'lp', ch, 1 / 6), b = curveDb(CMP, 'lp', ch, 1 / 6); if (a && b) curves.push({ y: a.map((v, i) => v - b[i]), color: css(ch === 'L' ? '--c-l' : '--c-r'), width: 2 }); });
+    drawChart($('diffChart'), { fmin: 20, fmax: ui.range === 'low' ? 500 : 20000, curves, vlines: [], ylabel: 'Változás (dB)', defLo: -10, defHi: 10 });
+  }
+}
+$('smoothSel').addEventListener('change', e => { ui.smooth = +e.target.value; saveUI(); renderResults(); });
+$$('[data-range]').forEach(b => b.addEventListener('click', () => { ui.range = b.dataset.range; saveUI(); renderResults(); }));
+$$('[data-mark]').forEach(b => b.addEventListener('click', () => { ui.marks[b.dataset.mark] = !ui.marks[b.dataset.mark]; saveUI(); renderResults(); }));
+function readoutAt(ev) {
+  if (!chartState) return;
+  const r = $('chart').getBoundingClientRect(), x = ev.clientX - r.left;
+  const f = chartState.fmin * Math.exp((x - chartState.ml) / chartState.pw * Math.log(chartState.fmax / chartState.fmin));
+  if (f < chartState.fmin || f > chartState.fmax) return;
+  const o = chartOpts(false); o.cross = f; chartState = drawChart($('chart'), o);
+  const i = gi(f);
+  const vals = o.curves.map(c => `${c.label.replace(/ \(.*\)/, '')}: ${isFinite(c.y[i]) ? nf(c.y[i]) + ' dB' : '–'}`);
+  const near = DSP.modes(P.room, c0(), 300).filter(m => m.kind < 3 && f < ACOU.sabine(P.room).fS * 1.2 && Math.abs(m.f - f) <= Math.max(0.05 * f, 2)).sort((a, b) => Math.abs(a.f - f) - Math.abs(b.f - f)).slice(0, 3).map(m => ACOU.modeName(m) + ' ' + nf(m.f) + ' Hz');
+  $('readout').textContent = `f = ${nf(G[i], 1)} Hz · ` + (vals.join(' · ') || 'nincs görbe') + (near.length ? ' · módus: ' + near.join(', ') : '');
+}
+$('chart').addEventListener('pointerdown', readoutAt);
+$('chart').addEventListener('pointermove', e => { if (e.buttons || e.pointerType === 'mouse') readoutAt(e); });
+window.addEventListener('resize', () => { if (ui.tab === 'results') renderResults(); });
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (ui.tab === 'results') renderResults(); });
+
+/* ---------- Elemzés ---------- */
+function analyzeChannel(ch) {
+  const id = 'an' + ch + P.set.thr + JSON.stringify(P.room);
+  if (cache.has(id)) return cache.get(id);
+  const lp12 = curveDb(P, 'lp', ch, 1 / 12);
+  if (!lp12) { cache.set(id, null); return null; }
+  const lpR = curveDb(P, 'lp', ch, 1 / 48), lpO = curveDb(P, 'lp', ch, 1);
+  const nf12 = curveDb(P, 'nf', ch, 1 / 12), nfR = curveDb(P, 'nf', ch, 1 / 48), nfO = curveDb(P, 'nf', ch, 1);
+  const c = c0(), sb = ACOU.sabine(P.room), fm = fNF(P);
+  const det = ACOU.detect({ G, PPO, lp12, lpR, lpO, nf12, nfR, nfO, fm, thr: P.set.thr });
+  const { basis, fLow, fLim, speaker } = det;
+  const ctx2 = { room: P.room, c, spk: P.room.spk[ch], lp: P.room.lp, modeList: DSP.modes(P.room, c, 400), sb: DSP.sbir(P.room.spk[ch], P.room, c), fS: sb.fS, refl: DSP.firstReflections(P.room.spk[ch], P.room.lp, P.room) };
+  const problems = det.ext.map(p => ACOU.classify(p, ctx2));
+  const portMissing = P.room.rp > 0 && !!nf12 && !(P.meas['nfp_' + ch] && P.meas['nfp_' + ch].points.length);
+  const res = { basis, problems, speaker, fLow, fLim, portMissing };
+  cache.set(id, res); return res;
+}
+
+function renderAdvice() {
+  const r = P.room, c = c0(), sb = ACOU.sabine(r), fm = fNF(P);
+  $('advKV').innerHTML = [
+    [nf(sb.V, 1) + ' m³', 'térfogat'], [nf(sb.fS, 0) + ' Hz', 'Schroeder-frekvencia'], [nf(sb.Tmid, 2) + ' s', 'becsült T60 (közép)'],
+    [nf(sb.Ttarget, 2) + ' s', 'célérték (EBU)'], [nf(fm, 0) + ' Hz', 'közeltér érvényes eddig'], [nf(r.lp.x / r.L * 100, 0) + '%', 'hallgatási pont a hossz arányában']
+  ].map(([b, s]) => `<div><b>${b}</b><span>${s}</span></div>`).join('');
+  const notes = [];
+  const ratio = r.lp.x / r.L;
+  if (Math.abs(ratio - 0.5) < 0.05) notes.push(['warn', `A hallgatási pont a szoba hosszának közepén van (${nf(ratio * 100, 0)}%). Itt van az első hosszirányú módus (${nf(c / (2 * r.L), 1)} Hz) csomópontja: ezen a frekvencián basszushiány várható. Javasolt kb. 38% (x ≈ ${nf(0.38 * r.L, 2)} m).`]);
+  else if (Math.abs(ratio - 0.25) < 0.04 || Math.abs(ratio - 0.75) < 0.04) notes.push(['warn', `A hallgatási pont a hossz negyedénél van: itt a második hosszirányú módus (${nf(c / r.L, 1)} Hz) csomópontja. Javasolt kb. 38% (x ≈ ${nf(0.38 * r.L, 2)} m).`]);
+  if (!Object.keys(P.meas).length) notes.push(['', 'Még nincs mérés. Az alábbi táblázatok a szoba méreteiből számolnak; a problémalista a mérés után jelenik meg.']);
+  if (P.example) notes.push(['warn', 'A szobaadatok még a példaértékek. Írd át őket a Szoba fülön.']);
+  $('advNotes').innerHTML = notes.map(([k, t]) => `<p class="note ${k}">${esc(t)}</p>`).join('');
+
+  $('advChannels').innerHTML = ['L', 'R'].map(ch => {
+    const nm = ch === 'L' ? 'Bal hangfal' : 'Jobb hangfal', an = analyzeChannel(ch);
+    if (!an) return `<div class="panel"><h2>${nm}</h2><p class="muted">Nincs hallgatási pont mérés ehhez a csatornához.</p></div>`;
+    const basisTxt = an.basis === 'room'
+      ? `Alap: szobahatás (hallgatási pont − közeltér), ${nf(an.fLow, 0)}–${nf(an.fLim, 0)} Hz.`
+      : `Alap: hallgatási pont a saját 1 oktávos trendjéhez képest, ${nf(an.fLow, 0)}–${nf(an.fLim, 0)} Hz. Közeltéri mérés nélkül a hangfal saját hibái nem választhatók le.`;
+    const rows = an.problems.map(p => `<tr class="prob"><td class="num">${nf(p.f, 1)}</td><td>${p.type === 'peak' ? pill('fail', 'csúcs') : pill('warn', 'völgy')}</td><td class="num">${p.db > 0 ? '+' : ''}${nf(p.db)}</td><td class="num">${p.Q ? nf(p.Q, 1) : '–'}</td><td>${esc(p.cause)}<details><summary>Javaslat</summary><ul>${p.rec.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details></td></tr>`).join('');
+    const port = an.portMissing ? `<p class="note warn">A reflexnyílás közeltéri mérése hiányzik. A nyílás a mélyhang egy részét sugározza (a hangolási frekvencia környékén), ezért kb. 100 Hz alatt a szobahatás görbe bizonytalan. Mérd meg, vagy ha nincs nyílás, állítsd a sugarát 0-ra a Szoba fülön.</p>` : '';
+    const spk = an.speaker.length ? `<p class="small muted">A hangfal saját karakterisztikája (közeltérben is látszik, nem szobaprobléma): ${an.speaker.map(s => `${nf(s.f, 0)} Hz (${s.db > 0 ? '+' : ''}${nf(s.db)} dB)`).join(', ')}.</p>` : '';
+    return `<div class="panel"><h2>${nm}</h2><p class="small muted">${basisTxt} Küszöb: ±${nf(P.set.thr, 0)} dB.</p>${port}
+      ${an.problems.length ? `<div class="tablewrap"><table><thead><tr><th class="num">f (Hz)</th><th>Típus</th><th class="num">Eltérés (dB)</th><th class="num">Q</th><th>Ok és javaslat</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p>A küszöbnél nagyobb csúcs vagy völgy nem található.</p>'}${spk}</div>`;
+  }).join('');
+
+  $('rtTable').innerHTML = `<thead><tr><th class="num">Sáv (Hz)</th><th class="num">A (m²)</th><th class="num">T60 (s)</th><th class="num">Cél (s)</th><th class="num">Hiányzó A (m²)</th><th class="num">50 mm ásványgyapot (m²)</th></tr></thead><tbody>` +
+    sb.need.map(n => `<tr><td class="num">${n.f}</td><td class="num">${nf(n.A, 1)}</td><td class="num">${nf(n.T, 2)}</td><td class="num">${nf(sb.Ttarget, 2)}</td><td class="num">${n.dA > 0 ? nf(n.dA, 1) : '–'}</td><td class="num">${n.dA <= 0 ? 'nem kell' : n.f < 200 ? 'mélyabszorber' : nf(n.wool, 1)}</td></tr>`).join('') +
+    `</tbody><caption class="small muted" style="caption-side:bottom;text-align:left;padding-top:8px">125 Hz-en a porózus anyag kevéssé hatékony; ott a hangolt mélyabszorberek (membrán, Helmholtz) adják az elnyelést.</caption>`;
+
+  $('reflTable').innerHTML = `<thead><tr><th>Hangfal</th><th>Felület</th><th class="num">x (m)</th><th class="num">y (m)</th><th class="num">z (m)</th></tr></thead><tbody>` +
+    ['L', 'R'].map(ch => DSP.firstReflections(r.spk[ch], r.lp, r).map(f => `<tr><td>${ch === 'L' ? 'Bal' : 'Jobb'}</td><td>${f.wall}</td><td class="num">${nf(f.x, 2)}</td><td class="num">${nf(f.y, 2)}</td><td class="num">${nf(f.z, 2)}</td></tr>`).join('')).join('') + '</tbody>';
+  $('sbirTable').innerHTML = `<thead><tr><th>Hangfal</th><th>Felület</th><th class="num">d (m)</th><th class="num">1. völgy (Hz)</th><th class="num">2. völgy (Hz)</th></tr></thead><tbody>` +
+    ['L', 'R'].map(ch => DSP.sbir(r.spk[ch], r, c).map(s => `<tr><td>${ch === 'L' ? 'Bal' : 'Jobb'}</td><td>${s.name}</td><td class="num">${nf(s.d, 2)}</td><td class="num">${nf(s.f, 0)}</td><td class="num">${nf(s.f2, 0)}</td></tr>`).join('')).join('') + '</tbody>';
+  const ml = DSP.modes(r, c, Math.min(300, Math.max(150, sb.fS))).filter(m => m.kind < 3 || m.f < 150).slice(0, 40);
+  $('modeTable').innerHTML = `<thead><tr><th class="num">f (Hz)</th><th>Index</th><th>Típus</th><th>Csatolás bal</th><th>Csatolás jobb</th></tr></thead><tbody>` +
+    ml.map(m => { const cp = ch => DSP.modeP(m, r.spk[ch], r) * DSP.modeP(m, r.lp, r); const bar = v => `<div class="bar" title="${nf(v * 100, 0)}%"><i style="width:${v * 100}%"></i></div>`;
+      return `<tr><td class="num">${nf(m.f, 1)}</td><td class="mono">(${m.n.join(',')})</td><td>${['', 'axiális', 'tangenciális', 'ferde'][m.kind]}</td><td>${bar(cp('L'))}</td><td>${bar(cp('R'))}</td></tr>`; }).join('') + '</tbody>';
+}
+
+/* ---------- Mentés / betöltés ---------- */
+function f32ToB64(a) { const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); }
+function b64ToF32(b) { const s = atob(b), u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return new Float32Array(u.buffer); }
+function serialize(p) {
+  const o = JSON.parse(JSON.stringify({ ...p, meas: {} }));
+  o.meas = {};
+  Object.values(p.meas).forEach(m => { o.meas[m.key] = { ...m, points: m.points.map(pt => ({ ...pt, ir: f32ToB64(pt.ir) })) }; });
+  o.saved = new Date().toISOString();
+  return o;
+}
+function deserialize(o) {
+  if (!o || o.app !== 'szobaakusztika-mero') throw new Error('Ez nem a mérőprogram projektfájlja.');
+  const p = newProject();
+  Object.assign(p, o); p.room = Object.assign(newProject().room, o.room); p.set = Object.assign(newProject().set, o.set);
+  p.meas = {};
+  Object.values(o.meas || {}).forEach(m => { p.meas[m.key] = { ...m, points: m.points.map(pt => ({ ...pt, ir: b64ToF32(pt.ir) })) }; });
+  return p;
+}
+const fileName = () => (P.name || 'projekt').replace(/[^\wáéíóöőúüűÁÉÍÓÖŐÚÜŰ-]+/g, '_') + '_' + new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+function offerFile(name, text, type) {
+  const file = new File([text], name, { type });
+  if (navigator.canShare && navigator.share) {
+    try { if (navigator.canShare({ files: [file] })) { return navigator.share({ files: [file], title: name }).then(() => true).catch(e => { if (e.name === 'AbortError') return false; download(file, name); return true; }); } } catch (e) {}
+  }
+  download(file, name); return Promise.resolve(true);
+}
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); }
+$('saveBtn').addEventListener('click', () => {
+  const txt = JSON.stringify(serialize(P));
+  offerFile(fileName() + '.akusztika.json', txt, 'application/json').then(ok => { if (ok) { dirty = false; renderSaveState(); toast('Projekt mentve'); } });
+});
+$('openBtn').addEventListener('click', () => $('openFile').click());
+$('openFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { P = deserialize(JSON.parse(await f.text())); invalidate(); dirty = false; renderSaveState(); scheduleAutosave(); toast('Megnyitva: ' + f.name); showTab('results'); }
+  catch (err) { toast('Nem sikerült megnyitni: ' + err.message); }
+});
+$('newBtn').addEventListener('click', e => {
+  const b = e.currentTarget;
+  if (b.dataset.armed !== '1') { b.dataset.armed = '1'; b.textContent = 'Biztosan? A mentetlen mérések elvesznek'; setTimeout(() => { b.dataset.armed = ''; b.textContent = 'Új projekt'; }, 4000); return; }
+  b.dataset.armed = ''; b.textContent = 'Új projekt';
+  P = newProject(); invalidate(); dirty = false; renderSaveState(); scheduleAutosave(); showTab('room');
+});
+$('cmpBtn').addEventListener('click', () => $('cmpFile').click());
+$('cmpFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { CMP = deserialize(JSON.parse(await f.text())); CMP._file = f.name; invalidate(); ui.curves.cmpL = ui.curves.cmpR = true; renderProject(); toast('Összehasonlító betöltve'); }
+  catch (err) { toast('Nem sikerült: ' + err.message); }
+});
+$('cmpClear').addEventListener('click', () => { CMP = null; invalidate(); renderProject(); });
+
+/* CSV */
+$('csvBtn').addEventListener('click', () => {
+  const frac = ui.smooth, defs = curveDefs(frac).filter(d => d.y);
+  if (!defs.length) { toast('Nincs exportálható mérés.'); return; }
+  const n = v => isFinite(v) ? v.toFixed(2).replace('.', ',') : '';
+  const lines = ['Frekvencia (Hz);' + defs.map(d => d.label + ' (dB)').join(';')];
+  for (let i = 0; i < G.length; i++) lines.push(G[i].toFixed(2).replace('.', ',') + ';' + defs.map(d => n(d.y[i])).join(';'));
+  offerFile(fileName() + '.csv', '﻿' + lines.join('\r\n'), 'text/csv');
+});
+
+/* Jelentés */
+$('repBtn').addEventListener('click', () => {
+  const r = P.room, sb = ACOU.sabine(r), c = c0();
+  const img = range => { const cv = document.createElement('canvas'); const keep = ui.range; ui.range = range; const o = chartOpts(true); ui.range = keep;
+    o.curves.forEach(cc => { if (cc.id) { const map = { lpL: '--c-l', nfL: '--c-l', cmpL: '--c-l', lpR: '--c-r', nfR: '--c-r', cmpR: '--c-r', reL: '--c-room-l', reR: '--c-room-r' }; cc.color = LIGHT[map[cc.id]] || cc.color; } });
+    o.points.forEach(p => p.color = '#b0261d');
+    drawChart(cv, o, true, 1000, 420); return cv.toDataURL('image/png'); };
+  const probs = ['L', 'R'].map(ch => { const an = analyzeChannel(ch); if (!an) return ''; return `<div class="sec"><h2>${ch === 'L' ? 'Bal' : 'Jobb'} hangfal – problémák</h2>${an.problems.length ? `<table><tr><th>f (Hz)</th><th>Típus</th><th>dB</th><th>Ok</th><th>Javaslat</th></tr>${an.problems.map(p => `<tr><td>${nf(p.f, 1)}</td><td>${p.type === 'peak' ? 'csúcs' : 'völgy'}</td><td>${nf(p.db)}</td><td>${esc(p.cause)}</td><td>${p.rec.map(esc).join('<br>')}</td></tr>`).join('')}</table>` : '<p>Nincs a küszöbnél nagyobb eltérés.</p>'}</div>`; }).join('');
+  $('report').innerHTML = `<h1>${esc(P.name)}</h1><p>${new Date().toLocaleString('hu-HU')} · Szobaakusztika-mérő v1.1</p>${P.notes ? `<p>${esc(P.notes)}</p>` : ''}
+    <div class="sec"><h2>Szoba</h2><table><tr><td>Méret</td><td>${nf(r.L, 2)} × ${nf(r.W, 2)} × ${nf(r.H, 2)} m, V = ${nf(sb.V, 1)} m³</td></tr><tr><td>Hangsebesség</td><td>${nf(c, 1)} m/s (${nf(r.T, 0)} °C)</td></tr><tr><td>Schroeder-frekvencia</td><td>${nf(sb.fS, 0)} Hz</td></tr><tr><td>Becsült T60 / cél</td><td>${nf(sb.Tmid, 2)} s / ${nf(sb.Ttarget, 2)} s</td></tr><tr><td>Hallgatási pont</td><td>x ${nf(r.lp.x, 2)}, y ${nf(r.lp.y, 2)}, z ${nf(r.lp.z, 2)} m</td></tr></table></div>
+    <div class="sec"><h2>Frekvenciaátvitel</h2><img src="${img('full')}" alt="Teljes tartomány"><img src="${img('low')}" alt="20–500 Hz"></div>${probs}
+    <div class="sec"><h2>Utózengés és elnyelés</h2><table><tr><th>Hz</th><th>T60 (s)</th><th>Hiányzó A (m²)</th></tr>${sb.need.map(n => `<tr><td>${n.f}</td><td>${nf(n.T, 2)}</td><td>${n.dA > 0 ? nf(n.dA, 1) : '–'}</td></tr>`).join('')}</table></div>
+    <p style="font-size:9pt">A dB SPL értékek becsültek (0 dBFS = ${P.set.splFS} dB SPL). Kalibráció: ${P.set.calOn ? (P.set.cal ? 'egyéni fájl' : 'beépített iMM-6C') : 'kikapcsolva'}.</p>`;
+  setTimeout(() => { try { window.print(); } catch (e) { toast('A nyomtatás nem érhető el ebben a böngészőben.'); } }, 100);
+});
+
+/* Kalibráció */
+$('calOn').addEventListener('change', e => { P.set.calOn = e.target.checked; invalidate(); markDirty(); renderProject(); });
+$('calBtn').addEventListener('click', () => $('calFile').click());
+$('calFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const c = DSP.parseCal(await f.text());
+  if (c.pts.length < 10) { toast('A fájlban nincs elég frekvencia–dB pár.'); return; }
+  P.set.cal = { ...c, name: f.name }; invalidate(); markDirty(); renderProject(); toast('Kalibráció betöltve');
+});
+$('calReset').addEventListener('click', () => { P.set.cal = null; invalidate(); markDirty(); renderProject(); });
+
+function renderProject() {
+  bindInputs();
+  const cal = calObj();
+  $('calInfo').textContent = `${P.set.cal ? 'Egyéni: ' + P.set.cal.name : 'Beépített: Dayton iMM-6C (saját kalibrációs fájl)'} · ${cal.pts.length} pont, ${nf(cal.pts[0][0], 0)}–${nf(cal.pts[cal.pts.length - 1][0], 0)} Hz · eltérés ${nf(Math.min(...cal.pts.map(p => p[1])))}…+${nf(Math.max(...cal.pts.map(p => p[1])))} dB${cal.sens ? ` · fejléc: ${cal.sens.f} Hz, ${nf(cal.sens.db)}` : ''}`;
+  $('calOn').checked = !!P.set.calOn; $('calReset').hidden = !P.set.cal;
+  $('cmpInfo').textContent = CMP ? `${CMP._file} · ${CMP.name} · ${Object.keys(CMP.meas).length} mérés` : 'Nincs betöltve.';
+  $('cmpClear').hidden = !CMP;
+}
+
+/* ---------- Automatikus mentés (IndexedDB) ---------- */
+const IDB = {
+  open() { return new Promise((res, rej) => { const r = indexedDB.open('szobaakusztika', 1); r.onupgradeneeded = () => r.result.createObjectStore('p'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  async put(v) { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('p', 'readwrite'); t.objectStore('p').put(v, 'current'); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); },
+  async get() { const db = await this.open(); return new Promise((res, rej) => { const t = db.transaction('p', 'readonly'), q = t.objectStore('p').get('current'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+};
+let asT = null;
+function scheduleAutosave() {
+  clearTimeout(asT);
+  asT = setTimeout(async () => {
+    try { await IDB.put({ dirty, proj: serialize(P) }); $('autosaveInfo').textContent = 'Automatikus mentés a böngészőbe: ' + new Date().toLocaleTimeString('hu-HU') + '. Ez nem helyettesíti a fájlba mentést.'; }
+    catch (e) { $('autosaveInfo').textContent = 'Az automatikus mentés itt nem érhető el; mentsd a projektet fájlba.'; }
+  }, 800);
+}
+window.addEventListener('beforeunload', e => { if (dirty && Object.keys(P.meas).length) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ---------- Indulás ---------- */
+(async function init() {
+  try {
+    const s = await IDB.get();
+    if (s && s.proj) { P = deserialize(s.proj); dirty = !!s.dirty; toast('Az előző munkamenet visszaállítva'); }
+  } catch (e) {}
+  invalidate(); renderSaveState();
+  showTab(Object.keys(P.meas).length ? (ui.tab || 'results') : (P.example ? 'room' : ui.tab || 'measure'));
+  renderMic();
+})();
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Mérőlánc-teszt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: egy oszlopos műszerlap, lépésenként egymás alatti panelek; szám- és mérőadat monospace-ben */
+:root{
+  --bg:#f2f4f3; --surface:#ffffff; --fg:#1a1f1e; --muted:#5a6461; --line:#d7dddb;
+  --accent:#1d6b74; --accent-fg:#ffffff; --zone:rgba(29,107,116,.14);
+  --ok:#2c7a47; --warn:#9a6200; --fail:#b0261d;
+  --sans:"IBM Plex Sans",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111514; --surface:#191f1e; --fg:#e4eae8; --muted:#97a29e; --line:#2b3432;
+  --accent:#5db2ba; --accent-fg:#0d1716; --zone:rgba(93,178,186,.16);
+  --ok:#5bbf7c; --warn:#e3a640; --fail:#f06d63; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111514; --surface:#191f1e; --fg:#e4eae8; --muted:#97a29e; --line:#2b3432;
+  --accent:#5db2ba; --accent-fg:#0d1716; --zone:rgba(93,178,186,.16);
+  --ok:#5bbf7c; --warn:#e3a640; --fail:#f06d63; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:16px;line-height:1.5}
+.wrap{max-width:760px;margin:0 auto;padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+header h1{font-size:1.75rem;font-weight:600;margin:0;text-wrap:balance;letter-spacing:-.01em}
+header p{margin:6px 0 0;color:var(--muted);max-width:62ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel h2{margin:0;font-size:1.05rem;font-weight:600;display:flex;gap:10px;align-items:baseline}
+.step{font-family:var(--mono);font-size:.8rem;color:var(--accent);font-weight:500}
+.panel p{margin:0;color:var(--muted)}
+ol.check{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+button{font:inherit;font-weight:500;border-radius:8px;padding:11px 18px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-fg);cursor:pointer;min-height:44px}
+button.ghost{background:transparent;color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+select{font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);max-width:100%;min-height:44px}
+.meter{position:relative;height:34px;border-radius:6px;background:var(--bg);border:1px solid var(--line);overflow:hidden}
+.meter .zone{position:absolute;top:0;bottom:0;background:var(--zone);border-left:1px dashed var(--accent);border-right:1px dashed var(--accent)}
+.meter .bar{position:absolute;left:0;top:0;bottom:0;background:var(--accent);opacity:.85;width:0;transition:width 60ms linear}
+.scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.readout{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.6rem;font-weight:500}
+.readout small{font-size:.8rem;color:var(--muted);font-weight:400}
+.progress{height:6px;background:var(--bg);border-radius:3px;overflow:hidden;border:1px solid var(--line)}
+.progress div{height:100%;width:0;background:var(--accent)}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+td,th{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;font-size:.78rem;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.fail{color:var(--fail)} .pill.na{color:var(--muted)}
+.empty{color:var(--muted);font-style:italic}
+.alert{border-left:4px solid var(--fail);padding:10px 12px;background:var(--bg);border-radius:4px}
+.alert.info{border-left-color:var(--accent)}
+textarea{width:100%;min-height:200px;font-family:var(--mono);font-size:.8rem;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:10px}
+code,.mono{font-family:var(--mono);font-size:.88em}
+.verdict{font-weight:600;font-size:1.05rem}
+@media (prefers-reduced-motion:reduce){.meter .bar{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Mérőlánc-teszt</h1>
+    <p>Ellenőrzi, hogy ebben a böngészőben a Dayton iMM-6C egyszerre tud-e mérőjelet lejátszani és felvenni, a hangfeldolgozás valóban ki van-e kapcsolva, és stabil-e az időzítés. Kb. 11 másodperces automatikus teszt.</p>
+  </header>
+
+  <div id="secureErr" class="alert" hidden>Ez az oldal nem éri el a mikrofont. HTTPS-címről kell megnyitni (nem helyi fájlként), és a böngészőnek engedélyt kell adni a mikrofonhoz.</div>
+
+  <section class="panel">
+    <h2><span class="step">01</span>Csatlakoztatás</h2>
+    <ol class="check">
+      <li>A mikrofon USB-C-n az iPadhez csatlakozik.</li>
+      <li>A mikrofon fejhallgató-kimenete jack–2×RCA kábellel az erősítő analóg bemenetén.</li>
+      <li>Az erősítő hangereje <strong>alacsonyra</strong> állítva, a megfelelő bemenet kiválasztva.</li>
+      <li>A mikrofon kb. 1 m-re az egyik hangfal előtt, a hangfal felé.</li>
+    </ol>
+    <div class="row">
+      <button id="btnStart">Mikrofon engedélyezése</button>
+      <select id="devSel" aria-label="Bemeneti eszköz" hidden></select>
+    </div>
+    <p id="devInfo" class="mono"></p>
+  </section>
+
+  <section class="panel">
+    <h2><span class="step">02</span>Szintbeállítás</h2>
+    <p>Indítsd el a szintbeállító hangot (1 kHz), és az erősítő hangerejével állítsd a mért szintet a kijelölt sávba (−40…−20 dBFS). Ne legyen kellemetlenül hangos.</p>
+    <div class="row" style="justify-content:space-between">
+      <div class="readout"><span id="lvl">–</span> <small>dBFS</small></div>
+      <button id="btnTone" class="ghost" disabled>Szintbeállító hang</button>
+    </div>
+    <div class="meter" aria-hidden="true"><div class="zone" id="zone"></div><div class="bar" id="bar"></div></div>
+    <div class="scale"><span>−90</span><span>−70</span><span>−50</span><span>−30</span><span>−10</span><span>0</span></div>
+  </section>
+
+  <section class="panel">
+    <h2><span class="step">03</span>Automatikus teszt</h2>
+    <p>Sorrend: 2 s csend (zajszint), három 1 kHz-es hang 10 dB-es lépésekben (automatikus erősítés és zajszűrés ellenőrzése), majd öt rövid sweep fél másodpercenként (időzítés).</p>
+    <div class="row"><button id="btnTest" disabled>Teszt futtatása</button><span id="testStatus" class="mono"></span></div>
+    <div class="progress"><div id="prog"></div></div>
+  </section>
+
+  <section class="panel">
+    <h2><span class="step">04</span>Eredmény</h2>
+    <p id="verdict" class="empty">A teszt után itt jelenik meg, melyik feltétel teljesül.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Ellenőrzés</th><th>Mért érték</th><th>Állapot</th></tr></thead>
+        <tbody id="resBody">
+          <tr><td>Mérőmikrofon felismerve</td><td class="num">–</td><td><span class="pill na">Még nincs adat</span></td></tr>
+          <tr><td>Hangfeldolgozás kikapcsolva (böngésző szerint)</td><td class="num">–</td><td><span class="pill na">Még nincs adat</span></td></tr>
+          <tr><td>Visszaérkező mérőjel (SNR)</td><td class="num">–</td><td><span class="pill na">Még nincs adat</span></td></tr>
+          <tr><td>Nincs automatikus erősítés (10 dB-es lépések)</td><td class="num">–</td><td><span class="pill na">Még nincs adat</span></td></tr>
+          <tr><td>Szintstabilitás (nincs zajszűrés)</td><td class="num">–</td><td><span class="pill na">Még nincs adat</span></td></tr>
+          <tr><td>Időzítés stabilitása</td><td class="num">–</td><td><span class="pill na">Még nincs adat</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2><span class="step">05</span>Eredmény másolása</h2>
+    <p>Másold ki és illeszd be a beszélgetésbe, így ki tudom értékelni.</p>
+    <textarea id="report" readonly aria-label="Teszteredmény szövegként">Még nem futott teszt.</textarea>
+    <div class="row"><button id="btnCopy" class="ghost">Másolás</button><span id="copyMsg" class="mono"></span></div>
+  </section>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const MIN_DB=-90;
+let ctx=null, stream=null, src=null, proc=null, toneOsc=null, toneGain=null;
+let rec=null, recStart=null, levelRms=0;
+const st={settings:{},label:'',deviceId:''};
+
+// sáv a mérőn: -40..-20 dBFS
+const pct=db=>Math.max(0,Math.min(100,(db-MIN_DB)/(-MIN_DB)*100));
+$('zone').style.left=pct(-40)+'%'; $('zone').style.width=(pct(-20)-pct(-40))+'%';
+
+if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+  $('secureErr').hidden=false; $('btnStart').disabled=true;
+}
+
+function browserName(){
+  const ua=navigator.userAgent;
+  if(/EdgiOS|Edg\//.test(ua))return 'Edge';
+  if(/CriOS|Chrome\//.test(ua))return 'Chrome';
+  if(/FxiOS|Firefox/.test(ua))return 'Firefox';
+  if(/Safari/.test(ua))return 'Safari';
+  return 'ismeretlen';
+}
+
+async function ensureCtx(){
+  if(ctx)return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  try{ctx=new AC({sampleRate:48000});}catch(e){ctx=new AC();}
+}
+
+function stopStream(){
+  if(proc){proc.disconnect();proc.onaudioprocess=null;proc=null;}
+  if(src){src.disconnect();src=null;}
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null;}
+}
+
+async function openMic(deviceId){
+  await ensureCtx(); await ctx.resume();
+  stopStream();
+  const c={echoCancellation:false,noiseSuppression:false,autoGainControl:false,channelCount:1};
+  if(deviceId)c.deviceId={exact:deviceId};
+  stream=await navigator.mediaDevices.getUserMedia({audio:c,video:false});
+  const tr=stream.getAudioTracks()[0];
+  st.settings=tr.getSettings?tr.getSettings():{};
+  st.label=tr.label||'(név nélkül)';
+  st.deviceId=st.settings.deviceId||'';
+  src=ctx.createMediaStreamSource(stream);
+  proc=ctx.createScriptProcessor(2048,1,1);
+  proc.onaudioprocess=onBlock;
+  src.connect(proc); proc.connect(ctx.destination);
+  await listDevices();
+  $('devInfo').textContent='Bemenet: '+st.label+' · '+ctx.sampleRate+' Hz · '+browserName();
+  $('btnTone').disabled=false; $('btnTest').disabled=false;
+  $('btnStart').textContent='Mikrofon újranyitása';
+}
+
+async function listDevices(){
+  const devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput');
+  const sel=$('devSel'); sel.innerHTML='';
+  devs.forEach((d,i)=>{const o=document.createElement('option');o.value=d.deviceId;o.textContent=d.label||('Bemenet '+(i+1));if(d.deviceId===st.deviceId||d.label===st.label)o.selected=true;sel.appendChild(o);});
+  sel.hidden=devs.length<2;
+}
+
+function onBlock(e){
+  const d=e.inputBuffer.getChannelData(0);
+  let s=0;for(let i=0;i<d.length;i++)s+=d[i]*d[i];
+  const rms=Math.sqrt(s/d.length);
+  levelRms=levelRms*0.6+rms*0.4;
+  if(rec){
+    if(recStart===null){
+      const pt=(typeof e.playbackTime==='number'&&e.playbackTime>0)?e.playbackTime:ctx.currentTime;
+      recStart=pt-d.length/ctx.sampleRate;
+    }
+    rec.push(new Float32Array(d));
+  }
+}
+
+function dbfs(rms){return rms>0?20*Math.log10(rms*Math.SQRT2):-Infinity;}
+(function draw(){
+  const db=dbfs(levelRms);
+  $('lvl').textContent=isFinite(db)&&ctx?db.toFixed(1):'–';
+  $('bar').style.width=(isFinite(db)?pct(db):0)+'%';
+  requestAnimationFrame(draw);
+})();
+
+function toggleTone(){
+  if(toneOsc){stopTone();return;}
+  toneOsc=ctx.createOscillator(); toneOsc.frequency.value=1000;
+  toneGain=ctx.createGain(); toneGain.gain.setValueAtTime(0,ctx.currentTime);
+  toneGain.gain.linearRampToValueAtTime(Math.pow(10,-26/20),ctx.currentTime+0.05);
+  toneOsc.connect(toneGain).connect(ctx.destination); toneOsc.start();
+  $('btnTone').textContent='Hang leállítása';
+}
+function stopTone(){
+  if(!toneOsc)return;
+  try{toneGain.gain.setValueAtTime(toneGain.gain.value,ctx.currentTime);toneGain.gain.linearRampToValueAtTime(0,ctx.currentTime+0.05);toneOsc.stop(ctx.currentTime+0.06);}catch(e){}
+  toneOsc=null; $('btnTone').textContent='Szintbeállító hang';
+}
+
+// ---- jelek ----
+const PLAN={sil:[0.2,1.8],tones:[{db:-36,a:2.2,b:3.7},{db:-26,a:3.9,b:5.4},{db:-16,a:5.6,b:7.1}],chirp0:7.6,gap:0.5,n:5,end:10.4};
+const CH={f1:200,f2:8000,dur:0.1,db:-16};
+function makeChirp(sr){
+  const N=Math.round(CH.dur*sr), x=new Float32Array(N), A=Math.pow(10,CH.db/20);
+  const K=Math.log(CH.f2/CH.f1), tap=Math.round(0.005*sr);
+  for(let i=0;i<N;i++){
+    const t=i/sr; let w=1;
+    if(i<tap)w=0.5-0.5*Math.cos(Math.PI*i/tap); else if(i>N-tap)w=0.5-0.5*Math.cos(Math.PI*(N-i)/tap);
+    x[i]=A*w*Math.sin(2*Math.PI*CH.f1*CH.dur/K*(Math.exp(t/CH.dur*K)-1));
+  }
+  return x;
+}
+
+function fft(re,im,inv){
+  const n=re.length;
+  for(let i=1,j=0;i<n;i++){let b=n>>1;for(;j&b;b>>=1)j^=b;j^=b;if(i<j){let t=re[i];re[i]=re[j];re[j]=t;t=im[i];im[i]=im[j];im[j]=t;}}
+  for(let len=2;len<=n;len<<=1){
+    const ang=2*Math.PI/len*(inv?1:-1),wr=Math.cos(ang),wi=Math.sin(ang),h=len>>1;
+    for(let i=0;i<n;i+=len){let cr=1,ci=0;for(let k=0;k<h;k++){const a=i+k,b=a+h;const tr=re[b]*cr-im[b]*ci,ti=re[b]*ci+im[b]*cr;re[b]=re[a]-tr;im[b]=im[a]-ti;re[a]+=tr;im[a]+=ti;const nc=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=nc;}}
+  }
+  if(inv)for(let i=0;i<n;i++){re[i]/=n;im[i]/=n;}
+}
+function xcorr(x,ref){
+  let n=1;while(n<x.length+ref.length)n<<=1;
+  const ar=new Float64Array(n),ai=new Float64Array(n),br=new Float64Array(n),bi=new Float64Array(n);
+  ar.set(x);br.set(ref);fft(ar,ai,false);fft(br,bi,false);
+  for(let i=0;i<n;i++){const r=ar[i]*br[i]+ai[i]*bi[i],m=ai[i]*br[i]-ar[i]*bi[i];ar[i]=r;ai[i]=m;}
+  fft(ar,ai,true);return ar.subarray(0,x.length);
+}
+function toneAmp(x,f,sr){
+  const w=2*Math.PI*f/sr,c=2*Math.cos(w);let s1=0,s2=0;
+  for(let i=0;i<x.length;i++){const s=x[i]+c*s1-s2;s2=s1;s1=s;}
+  const re=s1-s2*Math.cos(w),im=s2*Math.sin(w);return 2*Math.sqrt(re*re+im*im)/x.length;
+}
+const dB=a=>a>0?20*Math.log10(a):-Infinity;
+
+async function runTest(){
+  stopTone();
+  $('btnTest').disabled=true; $('btnTone').disabled=true; $('btnStart').disabled=true;
+  $('testStatus').textContent='Fut… maradj csendben';
+  const sr=ctx.sampleRate, T0=ctx.currentTime+0.4;
+  // hangok
+  PLAN.tones.forEach(t=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=1000;
+    const A=Math.pow(10,t.db/20);g.gain.setValueAtTime(0,T0+t.a);g.gain.linearRampToValueAtTime(A,T0+t.a+0.01);
+    g.gain.setValueAtTime(A,T0+t.b-0.01);g.gain.linearRampToValueAtTime(0,T0+t.b);
+    o.connect(g).connect(ctx.destination);o.start(T0+t.a);o.stop(T0+t.b+0.02);
+  });
+  const chirp=makeChirp(sr), buf=ctx.createBuffer(1,chirp.length,sr); buf.copyToChannel?buf.copyToChannel(chirp,0):buf.getChannelData(0).set(chirp);
+  for(let k=0;k<PLAN.n;k++){const s=ctx.createBufferSource();s.buffer=buf;s.connect(ctx.destination);s.start(T0+PLAN.chirp0+k*PLAN.gap);}
+  recStart=null; rec=[];
+  const total=PLAN.end+0.4;
+  await new Promise(res=>{const iv=setInterval(()=>{const p=(ctx.currentTime-(T0-0.4))/total;$('prog').style.width=Math.min(100,p*100)+'%';if(p>=1){clearInterval(iv);res();}},100);});
+  const blocks=rec; rec=null;
+  let L=0;blocks.forEach(b=>L+=b.length);const x=new Float32Array(L);let o=0;blocks.forEach(b=>{x.set(b,o);o+=b.length;});
+  $('testStatus').textContent='Kiértékelés…';
+  await new Promise(r=>setTimeout(r,30));
+  try{analyse(x,sr,T0,chirp);}catch(err){$('testStatus').textContent='Hiba a kiértékelésben: '+err.message;}
+  $('btnTest').disabled=false; $('btnTone').disabled=false; $('btnStart').disabled=false;
+}
+
+function analyse(x,sr,T0,chirp){
+  const idx=t=>Math.round((T0+t-recStart)*sr);
+  const corr=xcorr(x,chirp);
+  let E=0;for(let i=0;i<chirp.length;i++)E+=chirp[i]*chirp[i];
+  // 1. sweep keresése a várt hely körül ±0,4 s
+  const exp0=idx(PLAN.chirp0), w=Math.round(0.4*sr);
+  let best=-1,bi=-1;for(let i=Math.max(0,exp0-w);i<Math.min(corr.length,exp0+w);i++){const v=Math.abs(corr[i]);if(v>best){best=v;bi=i;}}
+  const off=bi-exp0;
+  const at=t=>idx(t)+off;
+  // zaj a korrelációban (csendes szakasz)
+  let ns=0,nc=0;for(let i=Math.max(0,at(PLAN.sil[0]));i<Math.min(corr.length,at(PLAN.sil[1]));i++){ns+=corr[i]*corr[i];nc++;}
+  const snr=nc?dB(best/Math.sqrt(ns/nc)):NaN;
+  // sweep-ek érkezése, parabolikus finomítással
+  const arr=[];
+  for(let k=0;k<PLAN.n;k++){
+    const c=at(PLAN.chirp0+k*PLAN.gap),ww=Math.round(0.03*sr);let b=-1,j=-1;
+    for(let i=Math.max(1,c-ww);i<Math.min(corr.length-1,c+ww);i++){const v=Math.abs(corr[i]);if(v>b){b=v;j=i;}}
+    const y0=Math.abs(corr[j-1]),y1=Math.abs(corr[j]),y2=Math.abs(corr[j+1]);const d=(y0-2*y1+y2)?0.5*(y0-y2)/(y0-2*y1+y2):0;
+    arr.push(j+d);
+  }
+  const devs=[];for(let k=1;k<arr.length;k++)devs.push(arr[k]-arr[k-1]-PLAN.gap*sr);
+  const maxDev=Math.max(...devs.map(Math.abs));
+  const latency=off/sr*1000;
+  // zajszint
+  const s0=Math.max(0,at(PLAN.sil[0])),s1=Math.min(x.length,at(PLAN.sil[1]));
+  let ss=0;for(let i=s0;i<s1;i++)ss+=x[i]*x[i];const noise=dbfs(Math.sqrt(ss/Math.max(1,s1-s0)));
+  // 1 kHz szintek, harmadonként
+  const tones=PLAN.tones.map(t=>{
+    const a=at(t.a+0.25),b=at(t.b-0.25),n3=Math.floor((b-a)/3);
+    const parts=[0,1,2].map(p=>dB(toneAmp(x.subarray(a+p*n3,a+(p+1)*n3),1000,sr)));
+    return {ref:t.db,lvl:dB(toneAmp(x.subarray(a,b),1000,sr)),spread:Math.max(...parts)-Math.min(...parts)};
+  });
+  const steps=[tones[1].lvl-tones[0].lvl,tones[2].lvl-tones[1].lvl];
+  const spread=Math.max(...tones.map(t=>t.spread));
+  report({snr,maxDev,devs,latency,noise,tones,steps,spread,sr});
+}
+
+function pill(s){const m={ok:'Rendben',warn:'Ellenőrizd',fail:'Hiba',na:'Nem mérhető'};return '<span class="pill '+s+'">'+m[s]+'</span>';}
+const f1=v=>isFinite(v)?v.toFixed(1):'–';
+
+function report(r){
+  const S=st.settings, lab=st.label;
+  const micOk=/imm|dayton|usb/i.test(lab)?'ok':'warn';
+  const flags=['echoCancellation','noiseSuppression','autoGainControl'].map(k=>S[k]);
+  const procState=flags.some(v=>v===true)?'fail':(flags.every(v=>v===false)?'ok':'na');
+  const flagTxt='EC='+S.echoCancellation+' NS='+S.noiseSuppression+' AGC='+S.autoGainControl;
+  const sigOk=!isFinite(r.snr)?'fail':r.snr>=30?'ok':r.snr>=15?'warn':'fail';
+  const signal=sigOk!=='fail';
+  const stepErr=Math.max(...r.steps.map(s=>Math.abs(s-10)));
+  const agc=!signal?'na':stepErr<=1.5?'ok':stepErr<=3?'warn':'fail';
+  const stab=!signal?'na':r.spread<=1?'ok':r.spread<=2.5?'warn':'fail';
+  const tim=!signal?'na':r.maxDev<=2?'ok':r.maxDev<=48?'warn':'fail';
+  const rows=[
+    ['Mérőmikrofon felismerve',lab,micOk],
+    ['Hangfeldolgozás kikapcsolva (böngésző szerint)',flagTxt,procState],
+    ['Visszaérkező mérőjel (SNR)',f1(r.snr)+' dB',sigOk],
+    ['Nincs automatikus erősítés (10 dB-es lépések)',r.steps.map(f1).join(' / ')+' dB',agc],
+    ['Szintstabilitás (nincs zajszűrés)','±'+f1(r.spread/2)+' dB',stab],
+    ['Időzítés stabilitása','max '+f1(r.maxDev)+' minta ('+f1(r.maxDev/r.sr*1e6)+' µs)',tim]
+  ];
+  $('resBody').innerHTML=rows.map(x=>'<tr><td>'+x[0]+'</td><td class="num">'+esc(x[1])+'</td><td>'+pill(x[2])+'</td></tr>').join('');
+  const states=rows.map(x=>x[2]);
+  let v;
+  if(!signal)v='Nem érkezett vissza a mérőjel. Ellenőrizd a kábelt, az erősítő bemenetét és hangerejét, és hogy az iPad hangja a mikrofonra megy-e. Ha a hangfal szól, de a jel nem jön vissza, a böngésző visszhangszűrést alkalmaz.';
+  else if(states.includes('fail'))v='A böngésző ezen a beállításon nem alkalmas mérésre. Lásd a hibás sorokat.';
+  else if(states.includes('warn'))v='Működik, de van ellenőrizendő tétel. Küldd el az eredményt.';
+  else v='Minden feltétel teljesül: ez a böngésző alkalmas a mérőprogramhoz.';
+  $('verdict').className='verdict'; $('verdict').textContent=v;
+  $('testStatus').textContent='Kész';
+  const ln=[
+    'Mérőlánc-teszt eredménye – '+new Date().toLocaleString('hu-HU'),
+    'Böngésző: '+browserName()+' | '+navigator.userAgent,
+    'Bemenet: '+lab,
+    'Mintavétel: AudioContext '+r.sr+' Hz; sáv '+(S.sampleRate||'?')+' Hz; csatorna '+(S.channelCount||'?'),
+    'Késleltetés (böngésző): base '+f1((ctx.baseLatency||0)*1000)+' ms, output '+f1((ctx.outputLatency||0)*1000)+' ms',
+    'Beállítások: '+flagTxt,
+    'Zajszint: '+f1(r.noise)+' dBFS',
+    '1 kHz szintek: '+r.tones.map(t=>t.ref+' → '+f1(t.lvl)).join(', ')+' dBFS',
+    'Lépések: '+r.steps.map(f1).join(' / ')+' dB (elvárt 10)',
+    'Szintingadozás: '+f1(r.spread)+' dB',
+    'Sweep SNR: '+f1(r.snr)+' dB',
+    'Időközök eltérése: '+r.devs.map(d=>d.toFixed(2)).join(', ')+' minta',
+    'Becsült késleltetés (tájékoztató): '+f1(r.latency)+' ms',
+    'Összegzés: '+v
+  ];
+  $('report').value=ln.join('\n');
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+$('btnStart').addEventListener('click',async()=>{
+  try{await openMic($('devSel').hidden?undefined:$('devSel').value||undefined);}
+  catch(e){$('devInfo').textContent='Nem sikerült megnyitni a mikrofont: '+(e.name==='NotAllowedError'?'nincs engedély. Engedélyezd a mikrofont a böngészőnek (iPad Beállítások → a böngésző → Mikrofon) és ennek az oldalnak.':e.message);}
+});
+$('devSel').addEventListener('change',e=>openMic(e.target.value).catch(err=>$('devInfo').textContent=err.message));
+$('btnTone').addEventListener('click',toggleTone);
+$('btnTest').addEventListener('click',runTest);
+$('btnCopy').addEventListener('click',()=>{
+  const t=$('report');
+  navigator.clipboard.writeText(t.value).then(()=>$('copyMsg').textContent='Kimásolva').catch(()=>{t.focus();t.select();$('copyMsg').textContent='Jelöld ki és másold kézzel';});
+});
+})();
+</script>
+
+</body>
+</html>
